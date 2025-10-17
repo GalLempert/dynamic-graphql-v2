@@ -1,0 +1,79 @@
+# Zookeeper Structure for Dynamic GraphQL Service
+# This file contains the commands to create the Zookeeper tree structure
+# Execute these commands in the Zookeeper CLI (zkCli.sh or zkCli.cmd)
+
+# Set your environment and service name
+# ENV=dev
+# SERVICE=sigma
+
+# ========================================
+# Service Configuration
+# ========================================
+
+# Create base paths
+create /dev ""
+create /dev/sigma ""
+create /dev/sigma/apiPrefix "/api"
+
+# ========================================
+# Endpoints Configuration
+# ========================================
+
+# Create endpoints base path
+create /dev/sigma/endpoints ""
+
+# Example Endpoint 1: People (with sequence support)
+create /dev/sigma/endpoints/People ""
+create /dev/sigma/endpoints/People/path "/people"
+create /dev/sigma/endpoints/People/httpMethod "GET"
+create /dev/sigma/endpoints/People/databaseCollection "people"
+create /dev/sigma/endpoints/People/type "REST"
+create /dev/sigma/endpoints/People/sequenceEnabled "true"
+create /dev/sigma/endpoints/People/defaultBulkSize "100"
+
+# Example Endpoint 2: Users (without sequence support)
+create /dev/sigma/endpoints/Users ""
+create /dev/sigma/endpoints/Users/path "/users"
+create /dev/sigma/endpoints/Users/httpMethod "GET"
+create /dev/sigma/endpoints/Users/databaseCollection "users"
+create /dev/sigma/endpoints/Users/type "REST"
+create /dev/sigma/endpoints/Users/sequenceEnabled "false"
+create /dev/sigma/endpoints/Users/defaultBulkSize "50"
+
+# Example Endpoint 3: Products (GraphQL with sequence)
+create /dev/sigma/endpoints/Products ""
+create /dev/sigma/endpoints/Products/path "/products"
+create /dev/sigma/endpoints/Products/httpMethod "POST"
+create /dev/sigma/endpoints/Products/databaseCollection "products"
+create /dev/sigma/endpoints/Products/type "GRAPHQL"
+create /dev/sigma/endpoints/Products/sequenceEnabled "true"
+create /dev/sigma/endpoints/Products/defaultBulkSize "200"
+
+# ========================================
+# DataSource Configuration (MongoDB)
+# ========================================
+
+# Create dataSource base path
+create /dev/dataSource ""
+
+# MongoDB configuration
+create /dev/dataSource/mongodb.host "localhost"
+create /dev/dataSource/mongodb.port "27017"
+create /dev/dataSource/mongodb.database "dynamic-graphql"
+create /dev/dataSource/mongodb.username ""
+create /dev/dataSource/mongodb.password ""
+create /dev/dataSource/mongodb.authDatabase "admin"
+
+# ========================================
+# Notes:
+# ========================================
+# 1. Replace /dev with your actual ENV value (e.g., /prod, /staging)
+# 2. Replace /sigma with your actual SERVICE value
+# 3. To add more endpoints, copy the endpoint section and modify values
+# 4. Endpoint names (like "People", "Users") are arbitrary - they're just identifiers
+# 5. The "path" value is what the API will listen on (e.g., /api/people)
+# 6. Supported httpMethod values: GET, POST, PUT, DELETE
+# 7. Supported type values: REST, GRAPHQL
+# 8. sequenceEnabled: true/false - enables MongoDB Change Streams sequence queries
+# 9. defaultBulkSize: number - default page size for sequence queries (default: 100)
+# 10. Sequence query example: GET /api/people?sequence=0&bulkSize=50

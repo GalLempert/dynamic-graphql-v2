@@ -1,0 +1,99 @@
+{
+  "description": "Zookeeper configuration for Dynamic GraphQL Service",
+  "environment": "dev",
+  "service": "sigma",
+  "tree": {
+    "/dev": {
+      "data": "",
+      "children": {
+        "/dev/sigma": {
+          "data": "",
+          "children": {
+            "/dev/sigma/apiPrefix": {
+              "data": "/api"
+            },
+            "/dev/sigma/endpoints": {
+              "data": "",
+              "children": {
+                "/dev/sigma/endpoints/People": {
+                  "data": "",
+                  "children": {
+                    "/dev/sigma/endpoints/People/path": {
+                      "data": "/people"
+                    },
+                    "/dev/sigma/endpoints/People/httpMethod": {
+                      "data": "GET"
+                    },
+                    "/dev/sigma/endpoints/People/databaseCollection": {
+                      "data": "people"
+                    },
+                    "/dev/sigma/endpoints/People/type": {
+                      "data": "REST"
+                    }
+                  }
+                },
+                "/dev/sigma/endpoints/Users": {
+                  "data": "",
+                  "children": {
+                    "/dev/sigma/endpoints/Users/path": {
+                      "data": "/users"
+                    },
+                    "/dev/sigma/endpoints/Users/httpMethod": {
+                      "data": "GET"
+                    },
+                    "/dev/sigma/endpoints/Users/databaseCollection": {
+                      "data": "users"
+                    },
+                    "/dev/sigma/endpoints/Users/type": {
+                      "data": "REST"
+                    }
+                  }
+                },
+                "/dev/sigma/endpoints/Products": {
+                  "data": "",
+                  "children": {
+                    "/dev/sigma/endpoints/Products/path": {
+                      "data": "/products"
+                    },
+                    "/dev/sigma/endpoints/Products/httpMethod": {
+                      "data": "POST"
+                    },
+                    "/dev/sigma/endpoints/Products/databaseCollection": {
+                      "data": "products"
+                    },
+                    "/dev/sigma/endpoints/Products/type": {
+                      "data": "GRAPHQL"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/dev/dataSource": {
+          "data": "",
+          "children": {
+            "/dev/dataSource/mongodb.host": {
+              "data": "localhost"
+            },
+            "/dev/dataSource/mongodb.port": {
+              "data": "27017"
+            },
+            "/dev/dataSource/mongodb.database": {
+              "data": "dynamic-graphql"
+            },
+            "/dev/dataSource/mongodb.username": {
+              "data": ""
+            },
+            "/dev/dataSource/mongodb.password": {
+              "data": ""
+            },
+            "/dev/dataSource/mongodb.authDatabase": {
+              "data": "admin"
+            }
+          }
+        }
+      }
+    }
+  }
+}
