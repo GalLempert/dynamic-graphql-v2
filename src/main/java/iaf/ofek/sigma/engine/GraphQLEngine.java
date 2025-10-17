@@ -1,6 +1,7 @@
 package iaf.ofek.sigma.engine;
 
 import iaf.ofek.sigma.persistence.repository.DynamicMongoRepository;
+import io.micrometer.observation.annotation.Observed;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -29,6 +30,7 @@ public class GraphQLEngine {
     /**
      * Queries all documents from a collection
      */
+    @Observed(name = "graphql.request.duration", contextualName = "graphql.queryCollection")
     public List<Document> queryCollection(String collectionName) {
         logger.info("Querying collection: {}", collectionName);
         return mongoRepository.findAll(collectionName);
@@ -37,6 +39,7 @@ public class GraphQLEngine {
     /**
      * Queries a single document by ID
      */
+    @Observed(name = "graphql.request.duration", contextualName = "graphql.queryDocumentById")
     public Document queryDocumentById(String collectionName, String id) {
         logger.info("Querying document {} from collection: {}", id, collectionName);
         return mongoRepository.findById(collectionName, id);
@@ -45,6 +48,7 @@ public class GraphQLEngine {
     /**
      * Gets count of documents in a collection
      */
+    @Observed(name = "graphql.request.duration", contextualName = "graphql.getCollectionCount")
     public long getCollectionCount(String collectionName) {
         logger.info("Getting count for collection: {}", collectionName);
         return mongoRepository.count(collectionName);
@@ -54,6 +58,7 @@ public class GraphQLEngine {
      * Queries changes using sequence-based pagination with Change Streams
      * Returns a client-friendly response with nextSequence and data
      */
+    @Observed(name = "graphql.request.duration", contextualName = "graphql.queryBySequence")
     public Map<String, Object> queryBySequence(String collectionName, long startSequence, int bulkSize) {
         logger.info("Querying by sequence for collection: {}, sequence: {}, bulkSize: {}",
                    collectionName, startSequence, bulkSize);
