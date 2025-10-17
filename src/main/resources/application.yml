@@ -1,0 +1,46 @@
+spring:
+  application:
+    name: dynamic-graphql-v2
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/dynamic-graphql
+      database: dynamic-graphql
+  kafka:
+    bootstrap-servers: localhost:9092
+    consumer:
+      group-id: dynamic-graphql-group
+      auto-offset-reset: earliest
+
+server:
+  port: 8080
+
+zookeeper:
+  connection-string: ${ZOOKEEPER_URL:localhost:2181}
+  session-timeout: ${ZOOKEEPER_TIMEOUT:3000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,metrics,prometheus,info
+  endpoint:
+    health:
+      show-details: always
+  metrics:
+    export:
+      prometheus:
+        enabled: true
+  tracing:
+    enabled: true
+    sampling:
+      probability: 1.0
+  observations:
+    annotations:
+      enabled: true
+
+# Environment Variables (required)
+# ENV=dev|staging|prod
+# SERVICE=service-name
+# ZOOKEEPER_URL=localhost:2181 (optional, defaults to localhost:2181)
+# ZOOKEEPER_TIMEOUT=3000 (optional, defaults to 3000ms)
+# Zookeeper tree structure: /{ENV}/{SERVICE} and /{ENV}/dataSource
