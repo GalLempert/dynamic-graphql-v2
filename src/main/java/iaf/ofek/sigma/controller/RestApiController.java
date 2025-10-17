@@ -38,12 +38,6 @@ public class RestApiController {
         logger.info("Handling REST request: {} {} -> collection: {}", method, path, endpoint.getDatabaseCollection());
 
         try {
-            // Only supporting GET method
-            if (!"GET".equalsIgnoreCase(method)) {
-                return ResponseEntity.badRequest()
-                        .body("Only GET method is currently supported");
-            }
-
             // Check if sequence query is requested
             String sequenceParam = request.getParameter("sequence");
             String bulkSizeParam = request.getParameter("bulkSize");
