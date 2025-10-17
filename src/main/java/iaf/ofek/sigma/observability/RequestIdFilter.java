@@ -101,7 +101,7 @@ public class RequestIdFilter extends OncePerRequestFilter {
                 | 0x7000
                 | randomA;
 
-        long leastSignificantBits = randomB | 0x8000000000000000L;
+        long leastSignificantBits = (randomB & 0x3FFFFFFFFFFFFFFFL) | 0x8000000000000000L;
 
         return new UUID(mostSignificantBits, leastSignificantBits).toString();
     }
