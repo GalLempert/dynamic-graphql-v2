@@ -37,8 +37,17 @@ public class QueryService {
         this.queryBuilder = queryBuilder;
     }
 
+    public DynamicMongoRepository getRepository() {
+        return mongoRepository;
+    }
+
+    public QueryBuilder getQueryBuilder() {
+        return queryBuilder;
+    }
+
     /**
      * Executes a query request and returns a response
+     * Uses polymorphism - ZERO switch statements!
      *
      * @param request The query request
      * @param collectionName The collection to query
@@ -47,12 +56,7 @@ public class QueryService {
     @Observed(name = "query.execution", contextualName = "query.execute")
     public QueryResponse execute(QueryRequest request, String collectionName) {
         logger.info("Executing {} query on collection: {}", request.getType(), collectionName);
-
-        return switch (request.getType()) {
-            case FULL_COLLECTION -> executeFullCollection(collectionName);
-            case FILTERED -> executeFiltered((FilteredQueryRequest) request, collectionName);
-            case SEQUENCE_BASED -> executeSequence((SequenceQueryRequest) request, collectionName);
-        };
+        return request.execute(this, collectionName);
     }
 
     /**

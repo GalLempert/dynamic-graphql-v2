@@ -118,6 +118,10 @@ public class Endpoint {
         REST,
         GRAPHQL;
 
+        /**
+         * Parses string to EndpointType
+         * This switch is acceptable - it's enum parsing from external string
+         */
         public static EndpointType fromString(String type) {
             if (type == null) {
                 return REST;
@@ -126,6 +130,23 @@ public class Endpoint {
                 case "GRAPHQL" -> GRAPHQL;
                 case "REST" -> REST;
                 default -> REST;
+            };
+        }
+
+        /**
+         * Gets the handler for this endpoint type
+         * Polymorphic dispatch - no switch needed in ApiController!
+         * 
+         * @param restHandler The REST handler
+         * @param graphQLHandler The GraphQL handler
+         * @return The appropriate handler
+         */
+        public iaf.ofek.sigma.controller.EndpointHandler getHandler(
+                iaf.ofek.sigma.controller.RestEndpointHandler restHandler,
+                iaf.ofek.sigma.controller.GraphQLEndpointHandler graphQLHandler) {
+            return switch (this) {
+                case REST -> restHandler;
+                case GRAPHQL -> graphQLHandler;
             };
         }
     }

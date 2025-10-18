@@ -1,9 +1,7 @@
 package iaf.ofek.sigma.service.query;
 
 import iaf.ofek.sigma.dto.request.FilteredQueryRequest;
-import iaf.ofek.sigma.dto.request.FullCollectionRequest;
 import iaf.ofek.sigma.dto.request.QueryRequest;
-import iaf.ofek.sigma.dto.request.SequenceQueryRequest;
 import iaf.ofek.sigma.filter.FilterTranslator;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
@@ -21,18 +19,19 @@ public class QueryBuilder {
         this.filterTranslator = filterTranslator;
     }
 
+    public FilterTranslator getFilterTranslator() {
+        return filterTranslator;
+    }
+
     /**
      * Builds a MongoDB Query from a QueryRequest
+     * Uses polymorphism - ZERO switch statements!
      *
      * @param request The request to translate
      * @return MongoDB Query object (null for sequence-based queries)
      */
     public Query build(QueryRequest request) {
-        return switch (request.getType()) {
-            case FILTERED -> buildFilteredQuery((FilteredQueryRequest) request);
-            case FULL_COLLECTION -> buildFullCollectionQuery();
-            case SEQUENCE_BASED -> null; // Sequence queries don't use Query objects
-        };
+        return request.buildQuery(this);
     }
 
     /**

@@ -1,11 +1,13 @@
 package iaf.ofek.sigma.dto.response;
 
 import iaf.ofek.sigma.dto.request.WriteRequest;
+import lombok.Getter;
 
 /**
  * Response for UPSERT operations
  * Contains information about whether document was inserted or updated
  */
+@Getter
 public class UpsertResponse implements WriteResponse {
 
     private final boolean wasInserted;
@@ -35,19 +37,8 @@ public class UpsertResponse implements WriteResponse {
         return wasInserted ? 1 : modifiedCount;
     }
 
-    public boolean wasInserted() {
-        return wasInserted;
-    }
-
-    public String getDocumentId() {
-        return documentId;
-    }
-
-    public long getMatchedCount() {
-        return matchedCount;
-    }
-
-    public long getModifiedCount() {
-        return modifiedCount;
+    @Override
+    public <T> T accept(ResponseVisitor<T> visitor) {
+        return visitor.visitUpsert(this);
     }
 }

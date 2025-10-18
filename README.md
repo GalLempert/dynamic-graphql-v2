@@ -110,13 +110,13 @@ HTTP Response
 ├── endpoints/
 │   └── {endpointName}/
 │       ├── path                    # e.g., "/products"
-│       ├── httpMethod              # e.g., "GET"
+│       ├── httpMethod              # e.g., "GET" (for reads, POST also supported)
 │       ├── databaseCollection      # e.g., "products"
 │       ├── type                    # REST or GRAPHQL
 │       ├── sequenceEnabled         # true/false
 │       ├── defaultBulkSize         # e.g., 100
-│       ├── writeMethods            # e.g., "POST,PUT,PATCH,DELETE"
-│       ├── schema                  # e.g., "product-schema:required"
+│       ├── writeMethods            # e.g., "POST,PUT,PATCH,DELETE" (optional, for writes only)
+│       ├── schema                  # e.g., "product-schema:required" (optional, for writes)
 │       └── filter/                 # Filtering rules (_id always allowed)
 │           ├── {fieldName1}        # e.g., "price" → "$eq,$gt,$gte,$lt,$lte"
 │           ├── {fieldName2}        # e.g., "category" → "$eq,$in"
@@ -149,7 +149,7 @@ GET /api/products?category=electronics&limit=10&skip=20&sort=-price
 ```
 Returns 10 products, skip first 20, sorted by price descending.
 
-### 4. POST with Advanced Filters
+### 4. POST with Advanced Filters (READ operation)
 ```bash
 POST /api/products
 Content-Type: application/json
@@ -175,6 +175,7 @@ Content-Type: application/json
   }
 }
 ```
+**Note**: POST can be used for READ (filtered queries) or WRITE (create). If `writeMethods` includes POST, it's treated as a write operation.
 
 ### 5. Sequence-Based Query (Change Streams)
 ```bash
@@ -402,7 +403,7 @@ zkCli.sh create /dev/my-service/endpoints/products/filter/category "\$eq,\$in"
 ## Running the Application
 
 ### Prerequisites
-- Java 21+
+- Java 25+
 - Maven 3.8+
 - MongoDB 4.4+
 - ZooKeeper 3.8+

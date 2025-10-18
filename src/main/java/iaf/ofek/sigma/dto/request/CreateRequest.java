@@ -1,5 +1,7 @@
 package iaf.ofek.sigma.dto.request;
 
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 
@@ -9,6 +11,7 @@ import java.util.Map;
  * Supports both single document and bulk insert
  * Audit fields are automatically injected by the system
  */
+@Getter
 public class CreateRequest implements WriteRequest {
 
     private final List<Map<String, Object>> documents;
@@ -32,17 +35,8 @@ public class CreateRequest implements WriteRequest {
     }
 
     @Override
-    public String getRequestId() {
-        return requestId;
-    }
-
-    @Override
     public Map<String, Object> getFilter() {
         return null; // CREATE doesn't use filters
-    }
-
-    public List<Map<String, Object>> getDocuments() {
-        return documents;
     }
 
     /**
@@ -50,5 +44,25 @@ public class CreateRequest implements WriteRequest {
      */
     public boolean isBulk() {
         return documents.size() > 1;
+    }
+
+    /**
+     * Returns documents for schema validation (polymorphic OOP approach)
+     */
+    @Override
+    public List<Map<String, Object>> getDocumentsForValidation() {
+        return documents;
+    }
+
+    @Override
+    public iaf.ofek.sigma.dto.response.WriteResponse execute(
+            iaf.ofek.sigma.service.write.WriteService service,
+            String collectionName) {
+        return service.executeCreate(this, collectionName);
+    }
+
+    @Override
+    public String getHttpMethod() {
+        return "POST";
     }
 }

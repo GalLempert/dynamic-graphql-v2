@@ -11,45 +11,32 @@ import java.util.Map;
 /**
  * Builds HTTP ResponseEntity objects from QueryResponse and WriteResponse objects
  * Single Responsibility: Response formatting
+ * 
+ * Uses Visitor pattern to eliminate instanceof checks - pure OOP polymorphism
  */
 @Service
-public class ResponseBuilder {
+public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
 
     /**
      * Builds an HTTP response from a QueryResponse
+     * Uses Visitor pattern - no instanceof checks
      *
      * @param queryResponse The query response
      * @return HTTP ResponseEntity
      */
     public ResponseEntity<?> build(QueryResponse queryResponse) {
-        if (!queryResponse.isSuccess()) {
-            return buildErrorResponse((ErrorResponse) queryResponse);
-        }
-
-        if (queryResponse instanceof DocumentListResponse docResponse) {
-            return buildDocumentListResponse(docResponse);
-        }
-
-        if (queryResponse instanceof SequenceResponse seqResponse) {
-            return buildSequenceResponse(seqResponse);
-        }
-
-        // Unknown response type
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Unknown response type");
+        return queryResponse.accept(this);
     }
 
-    /**
-     * Builds response for document list
-     */
-    private ResponseEntity<?> buildDocumentListResponse(DocumentListResponse response) {
+    // ========== VISITOR PATTERN IMPLEMENTATIONS ==========
+    
+    @Override
+    public ResponseEntity<?> visitDocumentList(DocumentListResponse response) {
         return ResponseEntity.ok(response.getDocuments());
     }
 
-    /**
-     * Builds response for sequence query
-     */
-    private ResponseEntity<?> buildSequenceResponse(SequenceResponse response) {
+    @Override
+    public ResponseEntity<?> visitSequence(SequenceResponse response) {
         Map<String, Object> body = new HashMap<>();
         body.put("nextSequence", response.getNextSequence());
         body.put("data", response.getData());
@@ -58,10 +45,8 @@ public class ResponseBuilder {
         return ResponseEntity.ok(body);
     }
 
-    /**
-     * Builds error response
-     */
-    private ResponseEntity<?> buildErrorResponse(ErrorResponse response) {
+    @Override
+    public ResponseEntity<?> visitError(ErrorResponse response) {
         Map<String, Object> body = new HashMap<>();
         body.put("error", response.getErrorMessage());
 
@@ -72,75 +57,8 @@ public class ResponseBuilder {
         return ResponseEntity.badRequest().body(body);
     }
 
-    /**
-     * Builds a validation error response
-     */
-    public ResponseEntity<?> buildValidationError(String message, java.util.List<String> details) {
-        ErrorResponse errorResponse = new ErrorResponse(message, details);
-        return buildErrorResponse(errorResponse);
-    }
-
-    /**
-     * Builds a generic error response
-     */
-    public ResponseEntity<?> buildError(String message) {
-        ErrorResponse errorResponse = new ErrorResponse(message);
-        return buildErrorResponse(errorResponse);
-    }
-
-    // ========== WRITE RESPONSE METHODS ==========
-
-    /**
-     * Builds an HTTP response from a write response (or error)
-     *
-     * @param response The write response or error response
-     * @return HTTP ResponseEntity
-     */
-    public ResponseEntity<?> buildWrite(Object response) {
-        // Handle error responses
-        if (response instanceof ErrorResponse errorResponse) {
-            return buildErrorResponse(errorResponse);
-        }
-
-        // Handle write responses
-        if (response instanceof WriteResponse writeResponse) {
-            return buildWriteResponse(writeResponse);
-        }
-
-        // Unknown response type
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Unknown response type");
-    }
-
-    /**
-     * Builds response for write operations
-     */
-    private ResponseEntity<?> buildWriteResponse(WriteResponse response) {
-        if (response instanceof CreateResponse createResponse) {
-            return buildCreateResponse(createResponse);
-        }
-
-        if (response instanceof UpdateResponse updateResponse) {
-            return buildUpdateResponse(updateResponse);
-        }
-
-        if (response instanceof DeleteResponse deleteResponse) {
-            return buildDeleteResponse(deleteResponse);
-        }
-
-        if (response instanceof UpsertResponse upsertResponse) {
-            return buildUpsertResponse(upsertResponse);
-        }
-
-        // Unknown write response type
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                .body("Unknown write response type");
-    }
-
-    /**
-     * Builds response for CREATE operation
-     */
-    private ResponseEntity<?> buildCreateResponse(CreateResponse response) {
+    @Override
+    public ResponseEntity<?> visitCreate(CreateResponse response) {
         Map<String, Object> body = new HashMap<>();
         body.put("type", "CREATE");
         body.put("success", response.isSuccess());
@@ -151,10 +69,8 @@ public class ResponseBuilder {
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
 
-    /**
-     * Builds response for UPDATE operation
-     */
-    private ResponseEntity<?> buildUpdateResponse(UpdateResponse response) {
+    @Override
+    public ResponseEntity<?> visitUpdate(UpdateResponse response) {
         Map<String, Object> body = new HashMap<>();
         body.put("type", "UPDATE");
         body.put("success", response.isSuccess());
@@ -165,10 +81,8 @@ public class ResponseBuilder {
         return ResponseEntity.ok(body);
     }
 
-    /**
-     * Builds response for DELETE operation
-     */
-    private ResponseEntity<?> buildDeleteResponse(DeleteResponse response) {
+    @Override
+    public ResponseEntity<?> visitDelete(DeleteResponse response) {
         Map<String, Object> body = new HashMap<>();
         body.put("type", "DELETE");
         body.put("success", response.isSuccess());
@@ -178,24 +92,53 @@ public class ResponseBuilder {
         return ResponseEntity.ok(body);
     }
 
-    /**
-     * Builds response for UPSERT operation
-     */
-    private ResponseEntity<?> buildUpsertResponse(UpsertResponse response) {
+    @Override
+    public ResponseEntity<?> visitUpsert(UpsertResponse response) {
         Map<String, Object> body = new HashMap<>();
         body.put("type", "UPSERT");
         body.put("success", response.isSuccess());
         body.put("affectedCount", response.getAffectedCount());
-        body.put("wasInserted", response.wasInserted());
+        body.put("wasInserted", response.isWasInserted());
 
-        if (response.wasInserted()) {
+        if (response.isWasInserted()) {
             body.put("documentId", response.getDocumentId());
         } else {
             body.put("matchedCount", response.getMatchedCount());
             body.put("modifiedCount", response.getModifiedCount());
         }
 
-        HttpStatus status = response.wasInserted() ? HttpStatus.CREATED : HttpStatus.OK;
+        HttpStatus status = response.isWasInserted() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(body);
+    }
+
+    // ========== UTILITY METHODS ==========
+
+    /**
+     * Builds a validation error response
+     */
+    public ResponseEntity<?> buildValidationError(String message, java.util.List<String> details) {
+        ErrorResponse errorResponse = new ErrorResponse(message, details);
+        return visitError(errorResponse);
+    }
+
+    /**
+     * Builds a generic error response
+     */
+    public ResponseEntity<?> buildError(String message) {
+        ErrorResponse errorResponse = new ErrorResponse(message);
+        return visitError(errorResponse);
+    }
+
+    // ========== WRITE RESPONSE METHODS ==========
+
+    /**
+     * Builds an HTTP response from a write response (or error)
+     * Uses Visitor pattern - ZERO instanceof checks!
+     *
+     * @param response The response (WriteResponse or ErrorResponse - both implement Response)
+     * @return HTTP ResponseEntity
+     */
+    public ResponseEntity<?> buildWrite(iaf.ofek.sigma.dto.response.Response response) {
+        return response.accept(this);
     }
 }

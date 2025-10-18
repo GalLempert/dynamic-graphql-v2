@@ -1,6 +1,7 @@
 package iaf.ofek.sigma.model.filter;
 
 import iaf.ofek.sigma.model.AuditFields;
+import lombok.Getter;
 
 import java.util.List;
 import java.util.Map;
@@ -13,6 +14,7 @@ import java.util.Map;
  * regardless of configuration. This ensures single document operations
  * are always possible.
  */
+@Getter
 public class FilterConfig {
 
     private final Map<String, List<FilterOperator>> fieldOperators;
@@ -21,14 +23,6 @@ public class FilterConfig {
     public FilterConfig(Map<String, List<FilterOperator>> fieldOperators, boolean enabled) {
         this.fieldOperators = fieldOperators;
         this.enabled = enabled;
-    }
-
-    public Map<String, List<FilterOperator>> getFieldOperators() {
-        return fieldOperators;
-    }
-
-    public boolean isEnabled() {
-        return enabled;
     }
 
     /**

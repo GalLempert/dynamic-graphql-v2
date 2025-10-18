@@ -1,11 +1,13 @@
 package iaf.ofek.sigma.dto.response;
 
 import iaf.ofek.sigma.dto.request.WriteRequest;
+import lombok.Getter;
 
 /**
  * Response for UPDATE operations
  * Contains counts of matched and modified documents
  */
+@Getter
 public class UpdateResponse implements WriteResponse {
 
     private final long matchedCount;
@@ -31,11 +33,8 @@ public class UpdateResponse implements WriteResponse {
         return modifiedCount;
     }
 
-    public long getMatchedCount() {
-        return matchedCount;
-    }
-
-    public long getModifiedCount() {
-        return modifiedCount;
+    @Override
+    public <T> T accept(ResponseVisitor<T> visitor) {
+        return visitor.visitUpdate(this);
     }
 }

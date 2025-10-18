@@ -23,9 +23,11 @@ public class RequestParser {
 
     private static final Logger logger = LoggerFactory.getLogger(RequestParser.class);
     private final ObjectMapper objectMapper;
+    private final WriteRequestFactory writeRequestFactory;
 
     public RequestParser(ObjectMapper objectMapper) {
         this.objectMapper = objectMapper;
+        this.writeRequestFactory = new WriteRequestFactory(objectMapper);
     }
 
     /**
@@ -205,13 +207,8 @@ public class RequestParser {
             requestId = "req-" + System.currentTimeMillis();
         }
 
-        return switch (method.toUpperCase()) {
-            case "POST" -> parseCreateRequest(body, requestId);
-            case "PUT" -> parseUpsertRequest(body, request, requestId);
-            case "PATCH" -> parseUpdateRequest(body, request, requestId);
-            case "DELETE" -> parseDeleteRequest(body, request, requestId);
-            default -> throw new IllegalArgumentException("Unsupported write method: " + method);
-        };
+        // Uses Strategy pattern via factory - ZERO switch statements!
+        return writeRequestFactory.create(method, body, request, requestId);
     }
 
     /**

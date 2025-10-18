@@ -1,6 +1,5 @@
 package iaf.ofek.sigma.service.write;
 
-import iaf.ofek.sigma.dto.request.CreateRequest;
 import iaf.ofek.sigma.dto.request.WriteRequest;
 import iaf.ofek.sigma.filter.FilterValidator;
 import iaf.ofek.sigma.model.Endpoint;
@@ -11,6 +10,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Validates write requests
@@ -42,7 +42,7 @@ public class WriteValidator {
         List<String> errors = new ArrayList<>();
 
         // 1. Validate write method is allowed
-        String writeMethod = mapWriteTypeToHttpMethod(request.getType());
+        String writeMethod = mapWriteTypeToHttpMethod(request);
         if (!endpoint.isWriteMethodAllowed(writeMethod)) {
             errors.add("Write method " + writeMethod + " is not allowed for this endpoint");
             return ValidationResult.failure(errors);
@@ -57,31 +57,22 @@ public class WriteValidator {
             errors.addAll(filterErrors);
         }
 
-        // 3. Validate schema (if required)
+        // 3. Validate schema (if required) - using polymorphism instead of instanceof
         if (endpoint.requiresSchemaValidation()) {
-            String schemaName = endpoint.getSchemaReference().getSchemaName();
+            List<Map<String, Object>> documentsToValidate = request.getDocumentsForValidation();
 
-            if (request instanceof CreateRequest createRequest) {
-                // Validate all documents
+            if (documentsToValidate != null && !documentsToValidate.isEmpty()) {
+                String schemaName = endpoint.getSchemaReference().getSchemaName();
                 SchemaValidator.ValidationResult schemaResult = schemaValidator.validateBulk(
-                        createRequest.getDocuments(),
-                        schemaName
-                );
-                if (!schemaResult.isValid()) {
-                    errors.addAll(schemaResult.getErrors());
-                }
-            } else if (request.getType() == WriteRequest.WriteType.UPSERT) {
-                // Validate upsert document
-                var upsertRequest = (iaf.ofek.sigma.dto.request.UpsertRequest) request;
-                SchemaValidator.ValidationResult schemaResult = schemaValidator.validate(
-                        upsertRequest.getDocument(),
+                        documentsToValidate,
                         schemaName
                 );
                 if (!schemaResult.isValid()) {
                     errors.addAll(schemaResult.getErrors());
                 }
             }
-            // Note: UPDATE doesn't need full schema validation as it's a partial update
+            // Note: UPDATE and DELETE return null from getDocumentsForValidation(),
+            // so they skip full schema validation (partial updates don't need it)
         }
 
         if (errors.isEmpty()) {
@@ -93,14 +84,10 @@ public class WriteValidator {
 
     /**
      * Maps write type to HTTP method
+     * Uses polymorphism - ZERO switch statements!
      */
-    private String mapWriteTypeToHttpMethod(WriteRequest.WriteType writeType) {
-        return switch (writeType) {
-            case CREATE -> "POST";
-            case UPDATE -> "PATCH";
-            case DELETE -> "DELETE";
-            case UPSERT -> "PUT";
-        };
+    private String mapWriteTypeToHttpMethod(WriteRequest request) {
+        return request.getHttpMethod();
     }
 
     /**

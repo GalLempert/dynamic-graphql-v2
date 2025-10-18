@@ -1,5 +1,7 @@
 package iaf.ofek.sigma.dto.request;
 
+import lombok.Getter;
+
 import java.util.Map;
 
 /**
@@ -10,6 +12,7 @@ import java.util.Map;
  * - Can delete single document (filter by _id) or multiple (filter by other fields)
  * - Supports soft delete if needed (would update a field instead of actual deletion)
  */
+@Getter
 public class DeleteRequest implements WriteRequest {
 
     private final Map<String, Object> filter;
@@ -30,16 +33,14 @@ public class DeleteRequest implements WriteRequest {
     }
 
     @Override
-    public String getRequestId() {
-        return requestId;
+    public iaf.ofek.sigma.dto.response.WriteResponse execute(
+            iaf.ofek.sigma.service.write.WriteService service,
+            String collectionName) {
+        return service.executeDelete(this, collectionName);
     }
 
     @Override
-    public Map<String, Object> getFilter() {
-        return filter;
-    }
-
-    public boolean isDeleteMultiple() {
-        return deleteMultiple;
+    public String getHttpMethod() {
+        return "DELETE";
     }
 }

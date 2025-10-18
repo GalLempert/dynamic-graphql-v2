@@ -106,9 +106,9 @@ public class Orchestrator {
      *
      * @param request The parsed write request
      * @param endpoint The endpoint configuration
-     * @return Write response (success or error)
+     * @return Response (WriteResponse or ErrorResponse - both implement Response interface)
      */
-    public Object executeWrite(WriteRequest request, Endpoint endpoint) {
+    public iaf.ofek.sigma.dto.response.Response executeWrite(WriteRequest request, Endpoint endpoint) {
         logger.info("Orchestrating {} write for endpoint: {} -> collection: {}",
                 request.getType(), endpoint.getName(), endpoint.getDatabaseCollection());
 
@@ -139,14 +139,9 @@ public class Orchestrator {
 
     /**
      * Helper to get response size for logging
+     * Uses polymorphism - no instanceof checks
      */
     private String getResponseSize(QueryResponse response) {
-        if (response instanceof iaf.ofek.sigma.dto.response.DocumentListResponse doc) {
-            return String.valueOf(doc.getCount());
-        }
-        if (response instanceof iaf.ofek.sigma.dto.response.SequenceResponse seq) {
-            return seq.getData().size() + " (sequence)";
-        }
-        return "N/A";
+        return response.getResponseSizeForLogging();
     }
 }

@@ -41,22 +41,18 @@ public class WriteService {
 
     /**
      * Executes a write request
+     * Uses polymorphism - ZERO switch statements!
      */
     public WriteResponse execute(WriteRequest request, String collectionName) {
         logger.info("Executing {} operation on collection: {}", request.getType(), collectionName);
-
-        return switch (request.getType()) {
-            case CREATE -> executeCreate((CreateRequest) request, collectionName);
-            case UPDATE -> executeUpdate((UpdateRequest) request, collectionName);
-            case DELETE -> executeDelete((DeleteRequest) request, collectionName);
-            case UPSERT -> executeUpsert((UpsertRequest) request, collectionName);
-        };
+        return request.execute(this, collectionName);
     }
 
     /**
      * Executes CREATE operation
+     * Made public for Template Method pattern
      */
-    private WriteResponse executeCreate(CreateRequest request, String collectionName) {
+    public WriteResponse executeCreate(CreateRequest request, String collectionName) {
         List<Map<String, Object>> documents = request.getDocuments().stream()
                 .map(doc -> AuditFields.injectForCreate(doc, request.getRequestId()))
                 .collect(Collectors.toList());
@@ -72,18 +68,13 @@ public class WriteService {
 
     /**
      * Executes UPDATE operation
+     * Made public for Template Method pattern
      */
-    private WriteResponse executeUpdate(UpdateRequest request, String collectionName) {
+    public WriteResponse executeUpdate(UpdateRequest request, String collectionName) {
         // Translate filter to MongoDB query
-        Query query = filterTranslator.translate(
-                new iaf.ofek.sigma.dto.request.FilteredQueryRequest(
-                        request.getFilter(),
-                        null,  // sort
-                        null,  // limit
-                        null,  // skip
-                        null   // fields
-                )
-        );
+        iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
+                new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
+        Query query = filterTranslator.translate(filterRequest);
 
         // Inject audit fields into updates
         Map<String, Object> updates = AuditFields.injectForUpdate(
@@ -104,18 +95,13 @@ public class WriteService {
 
     /**
      * Executes DELETE operation
+     * Made public for Template Method pattern
      */
-    private WriteResponse executeDelete(DeleteRequest request, String collectionName) {
+    public WriteResponse executeDelete(DeleteRequest request, String collectionName) {
         // Translate filter to MongoDB query
-        Query query = filterTranslator.translate(
-                new iaf.ofek.sigma.dto.request.FilteredQueryRequest(
-                        request.getFilter(),
-                        null,  // sort
-                        null,  // limit
-                        null,  // skip
-                        null   // fields
-                )
-        );
+        iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
+                new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
+        Query query = filterTranslator.translate(filterRequest);
 
         // Execute delete
         DeleteResult result = repository.delete(
@@ -129,18 +115,13 @@ public class WriteService {
 
     /**
      * Executes UPSERT operation
+     * Made public for Template Method pattern
      */
-    private WriteResponse executeUpsert(UpsertRequest request, String collectionName) {
+    public WriteResponse executeUpsert(UpsertRequest request, String collectionName) {
         // Translate filter to MongoDB query
-        Query query = filterTranslator.translate(
-                new iaf.ofek.sigma.dto.request.FilteredQueryRequest(
-                        request.getFilter(),
-                        null,  // sort
-                        null,  // limit
-                        null,  // skip
-                        null   // fields
-                )
-        );
+        iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
+                new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
+        Query query = filterTranslator.translate(filterRequest);
 
         // Inject audit fields (use injectForCreate as it may be a new document)
         Map<String, Object> document = AuditFields.injectForCreate(

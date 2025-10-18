@@ -66,7 +66,9 @@ public class RestApiController {
 
         try {
             // Determine if this is a read or write operation
-            if (isWriteOperation(method)) {
+            // POST can be used for both filtered reads and CREATE writes
+            // We check if the endpoint allows this method for writes
+            if (isWriteOperation(method, endpoint)) {
                 return handleWriteRequest(method, body, endpoint, request);
             } else {
                 return handleReadRequest(method, body, endpoint, request);
@@ -110,20 +112,30 @@ public class RestApiController {
         WriteRequest writeRequest = requestParser.parseWrite(method, body, request, endpoint);
 
         // 2. Call business logic (orchestrator handles validation + execution)
-        Object writeResponse = orchestrator.executeWrite(writeRequest, endpoint);
+        iaf.ofek.sigma.dto.response.Response writeResponse = orchestrator.executeWrite(writeRequest, endpoint);
 
         // 3. Format WriteResponse DTO → HTTP ResponseEntity
         return responseBuilder.buildWrite(writeResponse);
     }
 
     /**
-     * Checks if HTTP method is a write operation
+     * Checks if HTTP method is a write operation for this endpoint
+     *
+     * Important: POST can be used for BOTH:
+     * - Filtered reads (complex queries with JSON body)
+     * - CREATE writes (inserting new documents)
+     *
+     * We check if the endpoint explicitly allows this method for writes.
+     * If not configured for writes, we treat it as a read operation.
      */
-    private boolean isWriteOperation(String method) {
-        return "POST".equalsIgnoreCase(method) ||
-               "PUT".equalsIgnoreCase(method) ||
-               "PATCH".equalsIgnoreCase(method) ||
-               "DELETE".equalsIgnoreCase(method);
+    private boolean isWriteOperation(String method, Endpoint endpoint) {
+        // GET is always a read operation
+        if ("GET".equalsIgnoreCase(method)) {
+            return false;
+        }
+
+        // For other methods (POST, PUT, PATCH, DELETE), check if endpoint allows writes
+        return endpoint.isWriteMethodAllowed(method);
     }
 
     /**

@@ -4,8 +4,10 @@ import iaf.ofek.sigma.dto.request.WriteRequest;
 
 /**
  * Base interface for all write operation responses
+ * 
+ * Extends Response for unified polymorphic handling
  */
-public interface WriteResponse {
+public interface WriteResponse extends Response {
 
     /**
      * Returns the type of write operation that was performed
@@ -21,4 +23,10 @@ public interface WriteResponse {
      * Returns the number of documents affected
      */
     long getAffectedCount();
+
+    /**
+     * Visitor pattern for building HTTP responses
+     * Allows polymorphic dispatch without instanceof checks
+     */
+    <T> T accept(ResponseVisitor<T> visitor);
 }

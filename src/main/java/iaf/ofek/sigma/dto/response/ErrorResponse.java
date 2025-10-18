@@ -1,10 +1,13 @@
 package iaf.ofek.sigma.dto.response;
 
+import lombok.Getter;
+
 import java.util.List;
 
 /**
  * Response for errors
  */
+@Getter
 public class ErrorResponse extends QueryResponse {
 
     private final List<String> details;
@@ -19,7 +22,13 @@ public class ErrorResponse extends QueryResponse {
         this.details = details;
     }
 
-    public List<String> getDetails() {
-        return details;
+    @Override
+    public String getResponseSizeForLogging() {
+        return "error";
+    }
+
+    @Override
+    public <T> T accept(ResponseVisitor<T> visitor) {
+        return visitor.visitError(this);
     }
 }

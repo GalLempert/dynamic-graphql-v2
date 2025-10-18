@@ -1,11 +1,13 @@
 package iaf.ofek.sigma.dto.response;
 
 import iaf.ofek.sigma.dto.request.WriteRequest;
+import lombok.Getter;
 
 /**
  * Response for DELETE operations
  * Contains count of deleted documents
  */
+@Getter
 public class DeleteResponse implements WriteResponse {
 
     private final long deletedCount;
@@ -29,7 +31,8 @@ public class DeleteResponse implements WriteResponse {
         return deletedCount;
     }
 
-    public long getDeletedCount() {
-        return deletedCount;
+    @Override
+    public <T> T accept(ResponseVisitor<T> visitor) {
+        return visitor.visitDelete(this);
     }
 }

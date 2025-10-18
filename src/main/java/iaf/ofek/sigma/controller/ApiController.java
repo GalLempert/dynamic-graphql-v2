@@ -21,19 +21,19 @@ public class ApiController {
 
     private final ZookeeperConfigProperties configProperties;
     private final EndpointRegistry endpointRegistry;
-    private final RestApiController restApiController;
-    private final GraphQLController graphQLController;
+    private final RestEndpointHandler restEndpointHandler;
+    private final GraphQLEndpointHandler graphQLEndpointHandler;
 
     private String apiPrefix;
 
     public ApiController(ZookeeperConfigProperties configProperties,
                         EndpointRegistry endpointRegistry,
-                        RestApiController restApiController,
-                        GraphQLController graphQLController) {
+                        RestEndpointHandler restEndpointHandler,
+                        GraphQLEndpointHandler graphQLEndpointHandler) {
         this.configProperties = configProperties;
         this.endpointRegistry = endpointRegistry;
-        this.restApiController = restApiController;
-        this.graphQLController = graphQLController;
+        this.restEndpointHandler = restEndpointHandler;
+        this.graphQLEndpointHandler = graphQLEndpointHandler;
     }
 
     @PostConstruct
@@ -71,22 +71,8 @@ public class ApiController {
 
         logger.info("Matched endpoint: {}", endpoint);
 
-        // Route to appropriate controller based on endpoint type
-        return switch (endpoint.getType()) {
-            case REST -> restApiController.handleRestRequest(method, relativePath, body, endpoint, request);
-            case GRAPHQL -> handleGraphQLRequest(body, endpoint);
-        };
-    }
-
-    /**
-     * Handles GraphQL requests
-     * Note: GraphQL typically uses @DgsQuery/@DgsMutation annotations
-     * This is a fallback for dynamic routing
-     */
-    private ResponseEntity<?> handleGraphQLRequest(String body, Endpoint endpoint) {
-        logger.info("Routing to GraphQL controller for endpoint: {}", endpoint.getName());
-        // GraphQL requests will be handled by DGS framework
-        // This is a placeholder for custom GraphQL handling
-        return ResponseEntity.ok("GraphQL endpoint: " + endpoint.getName());
+        // Strategy pattern - get handler for endpoint type (ZERO switch statements!)
+        EndpointHandler handler = endpoint.getType().getHandler(restEndpointHandler, graphQLEndpointHandler);
+        return handler.handle(method, relativePath, body, endpoint, request);
     }
 }

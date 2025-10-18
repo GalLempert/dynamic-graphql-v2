@@ -29,6 +29,7 @@ public class RequestValidator {
 
     /**
      * Validates a query request
+     * Uses polymorphism - ZERO switch statements!
      *
      * @param request The request to validate
      * @param endpoint The endpoint configuration
@@ -36,18 +37,14 @@ public class RequestValidator {
      */
     public ValidationResult validate(QueryRequest request, Endpoint endpoint) {
         logger.debug("Validating request of type: {}", request.getType());
-
-        return switch (request.getType()) {
-            case SEQUENCE_BASED -> validateSequenceRequest((SequenceQueryRequest) request, endpoint);
-            case FILTERED -> validateFilteredRequest((FilteredQueryRequest) request, endpoint);
-            case FULL_COLLECTION -> ValidationResult.success(); // Always valid
-        };
+        return request.validate(this, endpoint);
     }
 
     /**
      * Validates a sequence-based request
+     * Made public for Template Method pattern
      */
-    private ValidationResult validateSequenceRequest(SequenceQueryRequest request, Endpoint endpoint) {
+    public ValidationResult validateSequenceRequest(SequenceQueryRequest request, Endpoint endpoint) {
         List<String> errors = new ArrayList<>();
 
         // Check if sequence queries are enabled
@@ -75,8 +72,9 @@ public class RequestValidator {
 
     /**
      * Validates a filtered request
+     * Made public for Template Method pattern
      */
-    private ValidationResult validateFilteredRequest(FilteredQueryRequest request, Endpoint endpoint) {
+    public ValidationResult validateFilteredRequest(FilteredQueryRequest request, Endpoint endpoint) {
         // If no filter, it's valid
         if (request.getFilterRequest() == null ||
             request.getFilterRequest().getFilter() == null ||

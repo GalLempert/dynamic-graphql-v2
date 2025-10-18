@@ -1,5 +1,7 @@
 package iaf.ofek.sigma.dto.request;
 
+import lombok.Getter;
+
 import java.util.Map;
 
 /**
@@ -11,6 +13,7 @@ import java.util.Map;
  * - Audit fields are automatically updated by the system
  * - Can update single document (filter by _id) or multiple (filter by other fields)
  */
+@Getter
 public class UpdateRequest implements WriteRequest {
 
     private final Map<String, Object> filter;
@@ -34,20 +37,14 @@ public class UpdateRequest implements WriteRequest {
     }
 
     @Override
-    public String getRequestId() {
-        return requestId;
+    public iaf.ofek.sigma.dto.response.WriteResponse execute(
+            iaf.ofek.sigma.service.write.WriteService service,
+            String collectionName) {
+        return service.executeUpdate(this, collectionName);
     }
 
     @Override
-    public Map<String, Object> getFilter() {
-        return filter;
-    }
-
-    public Map<String, Object> getUpdates() {
-        return updates;
-    }
-
-    public boolean isUpdateMultiple() {
-        return updateMultiple;
+    public String getHttpMethod() {
+        return "PATCH";
     }
 }

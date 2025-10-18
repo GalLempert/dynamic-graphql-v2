@@ -1,11 +1,14 @@
 package iaf.ofek.sigma.dto.response;
 
+import lombok.Getter;
+
 import java.util.List;
 import java.util.Map;
 
 /**
  * Response for sequence-based queries with pagination metadata
  */
+@Getter
 public class SequenceResponse extends QueryResponse {
 
     private final long nextSequence;
@@ -19,15 +22,13 @@ public class SequenceResponse extends QueryResponse {
         this.hasMore = hasMore;
     }
 
-    public long getNextSequence() {
-        return nextSequence;
+    @Override
+    public String getResponseSizeForLogging() {
+        return data.size() + " (sequence)";
     }
 
-    public List<Map<String, Object>> getData() {
-        return data;
-    }
-
-    public boolean isHasMore() {
-        return hasMore;
+    @Override
+    public <T> T accept(ResponseVisitor<T> visitor) {
+        return visitor.visitSequence(this);
     }
 }
