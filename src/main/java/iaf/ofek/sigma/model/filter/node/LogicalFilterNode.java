@@ -54,8 +54,9 @@ public class LogicalFilterNode extends FilterNode {
             List<String> childErrors = child.validate(config);
 
             // Add context to child errors
+            final int childIndex = i;  // Make effectively final for lambda
             childErrors = childErrors.stream()
-                    .map(err -> operator.getMongoOperator() + "[" + i + "]: " + err)
+                    .map(err -> operator.getMongoOperator() + "[" + childIndex + "]: " + err)
                     .collect(Collectors.toList());
 
             errors.addAll(childErrors);

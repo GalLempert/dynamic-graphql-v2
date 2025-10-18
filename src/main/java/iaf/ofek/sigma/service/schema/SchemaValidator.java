@@ -89,8 +89,9 @@ public class SchemaValidator {
             ValidationResult result = validate(documents.get(i), schemaName);
             if (!result.isValid()) {
                 // Prefix errors with document index
+                final int docIndex = i;  // Make effectively final for lambda
                 result.getErrors().forEach(error ->
-                        allErrors.add("Document[" + i + "]: " + error)
+                        allErrors.add("Document[" + docIndex + "]: " + error)
                 );
             }
         }
