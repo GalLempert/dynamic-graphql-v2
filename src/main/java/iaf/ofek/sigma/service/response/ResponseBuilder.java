@@ -1,6 +1,7 @@
 package iaf.ofek.sigma.service.response;
 
 import iaf.ofek.sigma.dto.response.*;
+import iaf.ofek.sigma.format.ResponseTimeFormatter;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -11,11 +12,17 @@ import java.util.Map;
 /**
  * Builds HTTP ResponseEntity objects from QueryResponse and WriteResponse objects
  * Single Responsibility: Response formatting
- * 
+ *
  * Uses Visitor pattern to eliminate instanceof checks - pure OOP polymorphism
  */
 @Service
 public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
+
+    private final ResponseTimeFormatter timeFormatter;
+
+    public ResponseBuilder(ResponseTimeFormatter timeFormatter) {
+        this.timeFormatter = timeFormatter;
+    }
 
     /**
      * Builds an HTTP response from a QueryResponse
@@ -32,14 +39,14 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
     
     @Override
     public ResponseEntity<?> visitDocumentList(DocumentListResponse response) {
-        return ResponseEntity.ok(response.getDocuments());
+        return ResponseEntity.ok(timeFormatter.formatDocuments(response.getDocuments()));
     }
 
     @Override
     public ResponseEntity<?> visitSequence(SequenceResponse response) {
         Map<String, Object> body = new HashMap<>();
         body.put("nextSequence", response.getNextSequence());
-        body.put("data", response.getData());
+        body.put("data", timeFormatter.formatDocuments(response.getData()));
         body.put("hasMore", response.isHasMore());
 
         return ResponseEntity.ok(body);

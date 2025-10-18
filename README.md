@@ -227,6 +227,52 @@ Content-Type: application/json
 ```
 Updates if user with email exists, creates new user if not.
 
+### 10. Custom Time Format
+```bash
+GET /api/users
+X-Time-Format: UNIX
+```
+Returns timestamps in Unix format (seconds since epoch). See [Supported Time Formats](#supported-time-formats) for all options.
+
+## Supported Time Formats
+
+You can customize the timestamp format in API responses by sending the `X-Time-Format` header with your request. All timestamp fields (`_createdAt`, `_updatedAt`) will be returned in the specified format.
+
+The system uses Java's standard `DateTimeFormatter`, supporting all standard Java time formats:
+
+| Format | Header Value | Description | Example |
+|--------|--------------|-------------|---------|
+| **ISO-8601** | `ISO-8601` or `ISO_INSTANT` or omit header | ISO 8601 instant format (default) | `2025-10-18T10:30:00.123Z` |
+| **RFC-3339** | `RFC-3339` or `ISO_OFFSET_DATE_TIME` | RFC 3339 with timezone offset | `2025-10-18T10:30:00.123+00:00` |
+| **Unix Timestamp** | `UNIX` | Seconds since Unix epoch | `1729247400` |
+| **Unix Milliseconds** | `UNIX-MILLIS` | Milliseconds since Unix epoch | `1729247400123` |
+| **Basic ISO Date** | `BASIC_ISO_DATE` | Compact date format | `20251018` |
+| **ISO Local Date** | `ISO_LOCAL_DATE` | Date without timezone | `2025-10-18` |
+| **ISO Local DateTime** | `ISO_LOCAL_DATE_TIME` | DateTime without timezone | `2025-10-18T10:30:00.123` |
+
+**Example:**
+```bash
+GET /api/products?limit=10
+X-Time-Format: UNIX
+
+# Response:
+[
+  {
+    "_id": "507f1f77bcf86cd799439011",
+    "name": "Product A",
+    "_createdAt": 1729247400,
+    "_updatedAt": 1729247400
+  }
+]
+```
+
+**Notes:**
+- Uses standard Java `DateTimeFormatter` constants
+- Header is case-insensitive
+- Invalid format values will fall back to ISO-8601
+- Time format applies to all timestamps in the response
+- All formats use UTC timezone
+
 ## Supported Filter Operators
 
 | Operator | Description | Example |
