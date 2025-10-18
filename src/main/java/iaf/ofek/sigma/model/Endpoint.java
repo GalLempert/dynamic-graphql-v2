@@ -1,5 +1,7 @@
 package iaf.ofek.sigma.model;
 
+import iaf.ofek.sigma.model.filter.FilterConfig;
+
 /**
  * Represents a dynamic endpoint configuration from Zookeeper
  * Structure in Zookeeper: /{ENV}/{SERVICE}/endpoints/{endpointName}/
@@ -13,9 +15,10 @@ public class Endpoint {
     private final EndpointType type;
     private final boolean sequenceEnabled;
     private final int defaultBulkSize;
+    private final FilterConfig filterConfig;
 
     public Endpoint(String name, String path, String httpMethod, String databaseCollection,
-                   EndpointType type, boolean sequenceEnabled, int defaultBulkSize) {
+                   EndpointType type, boolean sequenceEnabled, int defaultBulkSize, FilterConfig filterConfig) {
         this.name = name;
         this.path = path;
         this.httpMethod = httpMethod;
@@ -23,6 +26,7 @@ public class Endpoint {
         this.type = type;
         this.sequenceEnabled = sequenceEnabled;
         this.defaultBulkSize = defaultBulkSize;
+        this.filterConfig = filterConfig;
     }
 
     public String getName() {
@@ -53,6 +57,10 @@ public class Endpoint {
         return defaultBulkSize;
     }
 
+    public FilterConfig getFilterConfig() {
+        return filterConfig;
+    }
+
     /**
      * Creates a cache key for this endpoint (path + method)
      */
@@ -70,6 +78,7 @@ public class Endpoint {
                 ", type=" + type +
                 ", sequenceEnabled=" + sequenceEnabled +
                 ", defaultBulkSize=" + defaultBulkSize +
+                ", filterConfig=" + filterConfig +
                 '}';
     }
 

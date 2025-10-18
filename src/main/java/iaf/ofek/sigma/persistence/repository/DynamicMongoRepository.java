@@ -9,6 +9,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.ChangeStreamOptions;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
@@ -54,7 +55,15 @@ public class DynamicMongoRepository {
      */
     public long count(String collectionName) {
         logger.debug("Counting documents in collection: {}", collectionName);
-        return mongoTemplate.count(new org.springframework.data.mongodb.core.query.Query(), collectionName);
+        return mongoTemplate.count(new Query(), collectionName);
+    }
+
+    /**
+     * Finds documents using a complex query with filters, sorting, pagination, and projection
+     */
+    public List<Document> findWithQuery(String collectionName, Query query) {
+        logger.debug("Executing query on collection {}: {}", collectionName, query);
+        return mongoTemplate.find(query, Document.class, collectionName);
     }
 
     /**

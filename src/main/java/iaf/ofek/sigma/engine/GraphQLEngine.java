@@ -5,6 +5,7 @@ import io.micrometer.observation.annotation.Observed;
 import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
@@ -77,5 +78,15 @@ public class GraphQLEngine {
         clientResponse.put("hasMore", repositoryResponse.get("hasMore"));
 
         return clientResponse;
+    }
+
+    /**
+     * Queries collection with filter criteria
+     * Supports complex filtering, sorting, pagination, and projection
+     */
+    @Observed(name = "graphql.request.duration", contextualName = "graphql.queryWithFilter")
+    public List<Document> queryWithFilter(String collectionName, Query query) {
+        logger.info("Querying collection {} with filter: {}", collectionName, query);
+        return mongoRepository.findWithQuery(collectionName, query);
     }
 }

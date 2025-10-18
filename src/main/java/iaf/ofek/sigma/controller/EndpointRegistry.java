@@ -2,6 +2,8 @@ package iaf.ofek.sigma.controller;
 
 import iaf.ofek.sigma.config.properties.ZookeeperConfigProperties;
 import iaf.ofek.sigma.model.Endpoint;
+import iaf.ofek.sigma.model.filter.FilterConfig;
+import iaf.ofek.sigma.model.filter.FilterOperator;
 import iaf.ofek.sigma.zookeeper.ZookeeperConfigService;
 import iaf.ofek.sigma.zookeeper.util.ZookeeperUtils;
 import jakarta.annotation.PostConstruct;
@@ -9,9 +11,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.stream.Collectors;
 
 /**
  * Registry that caches dynamic endpoints from Zookeeper
@@ -80,6 +82,9 @@ public class EndpointRegistry {
                 boolean sequenceEnabled = Boolean.parseBoolean(sequenceEnabledStr);
                 int defaultBulkSize = defaultBulkSizeStr != null ? Integer.parseInt(defaultBulkSizeStr) : 100;
 
+                // Load filter configuration
+                FilterConfig filterConfig = loadFilterConfig(name, endpointsBasePath);
+
                 Endpoint endpoint = new Endpoint(
                     name,
                     path,
@@ -87,7 +92,8 @@ public class EndpointRegistry {
                     databaseCollection,
                     Endpoint.EndpointType.fromString(type),
                     sequenceEnabled,
-                    defaultBulkSize
+                    defaultBulkSize,
+                    filterConfig
                 );
 
                 String cacheKey = endpoint.getCacheKey();
@@ -136,5 +142,43 @@ public class EndpointRegistry {
         if (removed != null) {
             logger.info("Removed endpoint: {}", cacheKey);
         }
+    }
+
+    /**
+     * Loads filter configuration for an endpoint from Zookeeper
+     * Structure: /{ENV}/{SERVICE}/endpoints/{endpointName}/filter/{fieldName}
+     * Each field contains comma-separated operators: $eq,$gt,$lt
+     */
+    private FilterConfig loadFilterConfig(String endpointName, String endpointsBasePath) {
+        String filterBasePath = endpointsBasePath + "/" + endpointName + "/filter";
+        Map<String, byte[]> allConfig = configService.getAllConfiguration();
+        Map<String, List<FilterOperator>> fieldOperators = new HashMap<>();
+        boolean filterEnabled = false;
+
+        // Look for filter configuration nodes
+        for (Map.Entry<String, byte[]> entry : allConfig.entrySet()) {
+            String path = entry.getKey();
+            if (path.startsWith(filterBasePath + "/")) {
+                filterEnabled = true;
+                String fieldName = path.substring(filterBasePath.length() + 1);
+                String operatorsStr = ZookeeperUtils.bytesToString(entry.getValue()).orElse("");
+
+                // Parse operators (comma-separated)
+                List<FilterOperator> operators = Arrays.stream(operatorsStr.split(","))
+                        .map(String::trim)
+                        .filter(s -> !s.isEmpty())
+                        .map(FilterOperator::fromString)
+                        .collect(Collectors.toList());
+
+                fieldOperators.put(fieldName, operators);
+                logger.debug("Loaded filter config for {}.{}: {}", endpointName, fieldName, operators);
+            }
+        }
+
+        FilterConfig config = new FilterConfig(fieldOperators, filterEnabled);
+        if (filterEnabled) {
+            logger.info("Filter enabled for endpoint: {} with {} filterable fields", endpointName, fieldOperators.size());
+        }
+        return config;
     }
 }
