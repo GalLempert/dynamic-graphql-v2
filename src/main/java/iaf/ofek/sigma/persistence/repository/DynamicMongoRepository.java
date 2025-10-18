@@ -47,6 +47,7 @@ public class DynamicMongoRepository {
 
     /**
      * Performs a select * query on the specified collection
+     * Used by FullCollectionRequest
      */
     public List<Document> findAll(String collectionName) {
         logger.debug("Querying all documents from collection: {}", collectionName);
@@ -54,23 +55,8 @@ public class DynamicMongoRepository {
     }
 
     /**
-     * Finds a document by ID
-     */
-    public Document findById(String collectionName, String id) {
-        logger.debug("Querying document with id {} from collection: {}", id, collectionName);
-        return mongoTemplate.findById(id, Document.class, collectionName);
-    }
-
-    /**
-     * Counts documents in a collection
-     */
-    public long count(String collectionName) {
-        logger.debug("Counting documents in collection: {}", collectionName);
-        return mongoTemplate.count(new Query(), collectionName);
-    }
-
-    /**
      * Finds documents using a complex query with filters, sorting, pagination, and projection
+     * Used by FilteredQueryRequest
      */
     public List<Document> findWithQuery(String collectionName, Query query) {
         logger.debug("Executing query on collection {}: {}", collectionName, query);
