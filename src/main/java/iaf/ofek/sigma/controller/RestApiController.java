@@ -67,8 +67,8 @@ public class RestApiController {
         try {
             // Determine if this is a read or write operation
             // POST can be used for both filtered reads and CREATE writes
-            // We check if the endpoint allows this method for writes
-            if (isWriteOperation(method, endpoint)) {
+            // We inspect the body structure for POST to distinguish read from write
+            if (isWriteOperation(method, body, endpoint)) {
                 return handleWriteRequest(method, body, endpoint, request);
             } else {
                 return handleReadRequest(method, body, endpoint, request);
@@ -122,20 +122,60 @@ public class RestApiController {
      * Checks if HTTP method is a write operation for this endpoint
      *
      * Important: POST can be used for BOTH:
-     * - Filtered reads (complex queries with JSON body)
+     * - Filtered reads (complex queries with JSON body containing only "filter" and "options")
      * - CREATE writes (inserting new documents)
      *
-     * We check if the endpoint explicitly allows this method for writes.
-     * If not configured for writes, we treat it as a read operation.
+     * We check:
+     * 1. If endpoint allows writes for this method
+     * 2. For POST specifically, we inspect the body structure to distinguish read from write
      */
-    private boolean isWriteOperation(String method, Endpoint endpoint) {
+    private boolean isWriteOperation(String method, String body, Endpoint endpoint) {
         // GET is always a read operation
         if ("GET".equalsIgnoreCase(method)) {
             return false;
         }
 
-        // For other methods (POST, PUT, PATCH, DELETE), check if endpoint allows writes
-        return endpoint.isWriteMethodAllowed(method);
+        // Check if endpoint allows writes for this method
+        if (!endpoint.isWriteMethodAllowed(method)) {
+            return false;
+        }
+
+        // Special case: POST can be read or write depending on body structure
+        // POST with only {"filter": ..., "options": ...} = READ (filtered query)
+        // POST with document data = WRITE (CREATE)
+        if ("POST".equalsIgnoreCase(method) && body != null && !body.isEmpty()) {
+            return !isFilterOnlyBody(body);
+        }
+
+        // Other write methods (PUT, PATCH, DELETE) are always writes
+        return true;
+    }
+
+    /**
+     * Checks if POST body contains only filter/options (READ) vs document data (WRITE)
+     */
+    private boolean isFilterOnlyBody(String body) {
+        try {
+            body = body.trim();
+
+            // If body starts with "[", it's an array of documents = WRITE
+            if (body.startsWith("[")) {
+                return false;
+            }
+
+            // Parse as JSON and check top-level keys
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(body);
+
+            // If it has "filter" or "options" as top-level keys, it's a filtered read
+            // Otherwise, it's a document to insert
+            return root.has("filter") || root.has("options");
+
+        } catch (Exception e) {
+            // If we can't parse, assume it's a write operation (safer default)
+            logger.warn("Could not determine if POST body is filter or document: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**

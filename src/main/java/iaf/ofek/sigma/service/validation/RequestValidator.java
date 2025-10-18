@@ -82,10 +82,10 @@ public class RequestValidator {
             return ValidationResult.success();
         }
 
-        // Validate filter against configuration
+        // Validate filter against READ filter configuration
         List<String> errors = filterValidator.validate(
                 request.getFilterRequest().getFilter(),
-                endpoint.getFilterConfig()
+                endpoint.getReadFilterConfig()
         );
 
         return errors.isEmpty() ? ValidationResult.success() : ValidationResult.failure(errors);

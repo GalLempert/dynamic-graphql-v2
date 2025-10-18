@@ -24,10 +24,13 @@ This guide explains how to configure ZooKeeper for the dynamic GraphQL/REST API 
     │   ├── defaultBulkSize    # "100"
     │   ├── writeMethods       # "POST,PUT,PATCH,DELETE"
     │   ├── schema             # "user-schema:required"
-    │   └── filter/
-    │       ├── name           # "$eq,$regex"
-    │       ├── email          # "$eq"
-    │       └── age            # "$eq,$gt,$lt,$gte,$lte"
+    │   ├── readFilter/        # Filter config for READ operations (queries)
+    │   │   ├── name           # "$eq,$regex"
+    │   │   ├── email          # "$eq"
+    │   │   └── age            # "$eq,$gt,$lt,$gte,$lte"
+    │   └── writeFilter/       # Filter config for WRITE operations (updates/deletes)
+    │       ├── _id            # "$eq" (always allowed)
+    │       └── email          # "$eq" (unique identifier only)
     │
     └── products/
         ├── path               # "/api/products"
@@ -35,9 +38,12 @@ This guide explains how to configure ZooKeeper for the dynamic GraphQL/REST API 
         ├── databaseCollection # "products"
         ├── writeMethods       # "POST,PATCH,DELETE"
         ├── schema             # "product-schema:required"
-        └── filter/
-            ├── category       # "$eq,$in"
-            └── price          # "$eq,$gt,$lt,$gte,$lte"
+        ├── readFilter/        # Permissive for complex queries
+        │   ├── category       # "$eq,$in"
+        │   ├── price          # "$eq,$gt,$lt,$gte,$lte"
+        │   └── manufacturer   # "$eq,$in"
+        └── writeFilter/       # Restrictive - prevent mass updates
+            └── _id            # "$eq" (only allow targeting specific documents)
 ```
 
 ## Step-by-Step Setup
@@ -218,15 +224,19 @@ zkCli.sh create /dev/myservice/endpoints/users/defaultBulkSize "100"
 zkCli.sh create /dev/myservice/endpoints/users/writeMethods "POST,PUT,PATCH,DELETE"
 zkCli.sh create /dev/myservice/endpoints/users/schema "user-schema:required"
 
-# Filter configuration
-zkCli.sh create /dev/myservice/endpoints/users/filter
-zkCli.sh create /dev/myservice/endpoints/users/filter/name "\$eq,\$regex"
-zkCli.sh create /dev/myservice/endpoints/users/filter/email "\$eq"
-zkCli.sh create /dev/myservice/endpoints/users/filter/age "\$eq,\$gt,\$lt,\$gte,\$lte"
-zkCli.sh create /dev/myservice/endpoints/users/filter/role "\$eq,\$in"
-zkCli.sh create /dev/myservice/endpoints/users/filter/verified "\$eq"
+# READ Filter configuration (permissive - for complex queries)
+zkCli.sh create /dev/myservice/endpoints/users/readFilter
+zkCli.sh create /dev/myservice/endpoints/users/readFilter/name "\$eq,\$regex"
+zkCli.sh create /dev/myservice/endpoints/users/readFilter/email "\$eq"
+zkCli.sh create /dev/myservice/endpoints/users/readFilter/age "\$eq,\$gt,\$lt,\$gte,\$lte"
+zkCli.sh create /dev/myservice/endpoints/users/readFilter/role "\$eq,\$in"
+zkCli.sh create /dev/myservice/endpoints/users/readFilter/verified "\$eq"
 
-# Note: _id is always filterable with $eq, no need to configure
+# WRITE Filter configuration (restrictive - prevent mass updates/deletes)
+zkCli.sh create /dev/myservice/endpoints/users/writeFilter
+zkCli.sh create /dev/myservice/endpoints/users/writeFilter/email "\$eq"  # Unique identifier
+
+# Note: _id is always filterable with $eq for both read and write, no need to configure
 ```
 
 ### 5. Create Product Endpoint Configuration
@@ -244,13 +254,18 @@ zkCli.sh create /dev/myservice/endpoints/products/sequenceEnabled "false"
 zkCli.sh create /dev/myservice/endpoints/products/writeMethods "POST,PATCH,DELETE"
 zkCli.sh create /dev/myservice/endpoints/products/schema "product-schema:required"
 
-# Filter configuration
-zkCli.sh create /dev/myservice/endpoints/products/filter
-zkCli.sh create /dev/myservice/endpoints/products/filter/category "\$eq,\$in"
-zkCli.sh create /dev/myservice/endpoints/products/filter/price "\$eq,\$gt,\$lt,\$gte,\$lte"
-zkCli.sh create /dev/myservice/endpoints/products/filter/stock "\$eq,\$gt,\$lt,\$gte,\$lte"
-zkCli.sh create /dev/myservice/endpoints/products/filter/active "\$eq"
-zkCli.sh create /dev/myservice/endpoints/products/filter/sku "\$eq"
+# READ Filter configuration (permissive - for complex queries)
+zkCli.sh create /dev/myservice/endpoints/products/readFilter
+zkCli.sh create /dev/myservice/endpoints/products/readFilter/category "\$eq,\$in"
+zkCli.sh create /dev/myservice/endpoints/products/readFilter/price "\$eq,\$gt,\$lt,\$gte,\$lte"
+zkCli.sh create /dev/myservice/endpoints/products/readFilter/stock "\$eq,\$gt,\$lt,\$gte,\$lte"
+zkCli.sh create /dev/myservice/endpoints/products/readFilter/active "\$eq"
+zkCli.sh create /dev/myservice/endpoints/products/readFilter/sku "\$eq"
+zkCli.sh create /dev/myservice/endpoints/products/readFilter/manufacturer "\$eq,\$in"
+
+# WRITE Filter configuration (restrictive - only allow targeting by unique identifier)
+zkCli.sh create /dev/myservice/endpoints/products/writeFilter
+zkCli.sh create /dev/myservice/endpoints/products/writeFilter/sku "\$eq"  # Unique identifier
 ```
 
 ## Configuration Options
@@ -353,14 +368,20 @@ zkCli.sh set /dev/myservice/endpoints/users/writeMethods "POST,PATCH"
 ### Update Filter Configuration
 
 ```bash
-# Add new filterable field
-zkCli.sh create /dev/myservice/endpoints/users/filter/status "\$eq,\$in"
+# Add new READ filterable field
+zkCli.sh create /dev/myservice/endpoints/users/readFilter/status "\$eq,\$in"
 
-# Update existing field
-zkCli.sh set /dev/myservice/endpoints/users/filter/age "\$eq,\$gt,\$gte,\$lt,\$lte"
+# Update existing READ filter field
+zkCli.sh set /dev/myservice/endpoints/users/readFilter/age "\$eq,\$gt,\$gte,\$lt,\$lte"
 
-# Remove field
-zkCli.sh delete /dev/myservice/endpoints/users/filter/phoneNumber
+# Remove READ filter field
+zkCli.sh delete /dev/myservice/endpoints/users/readFilter/phoneNumber
+
+# Add WRITE filterable field (use caution - allows mass updates on this field)
+zkCli.sh create /dev/myservice/endpoints/users/writeFilter/status "\$eq"
+
+# Remove WRITE filter field (recommended for security)
+zkCli.sh delete /dev/myservice/endpoints/users/writeFilter/email
 ```
 
 ## Environment-Specific Configuration
@@ -408,9 +429,87 @@ zookeeper.base-path=/dev/myservice
 **Problem**: "Field 'salary' is not filterable on this endpoint"
 
 **Solutions**:
-1. Add field to filter config: `zkCli.sh create /path/filter/salary "\$eq,\$gt,\$lt"`
-2. Or use _id field which is always filterable
-3. Restart application
+1. For READ: `zkCli.sh create /path/readFilter/salary "\$eq,\$gt,\$lt"`
+2. For WRITE (use caution): `zkCli.sh create /path/writeFilter/salary "\$eq"`
+3. Or use _id field which is always filterable
+4. Restart application
+
+## Separate Read and Write Filters
+
+### Why Separate Filters?
+
+The system uses **separate filter configurations** for read and write operations for critical security and safety reasons:
+
+#### READ Filters (Permissive)
+- Allow complex queries with multiple operators
+- Support `$or`, `$in`, `$regex` for flexible searching
+- Enable users to query large datasets efficiently
+- **Example**: "Find all users aged 25-35 in role 'admin' or 'moderator'"
+
+#### WRITE Filters (Restrictive)
+- **Prevent mass updates/deletes** by limiting filterable fields
+- Typically only allow `_id` and unique identifiers (email, SKU)
+- Force users to target specific documents, not broad categories
+- **Example**: "Only allow updates/deletes by _id or email"
+
+### Security Benefits
+
+```bash
+# READ: Allow broad queries
+GET /api/products?category=electronics&price[gt]=100&price[lt]=500
+✓ Allowed - complex queries are safe for reads
+
+# WRITE: Prevent accidental mass updates
+PATCH /api/products?category=electronics  # Body: {"price": 0}
+✗ BLOCKED - 'category' not in writeFilter (would update thousands of products!)
+
+# WRITE: Only allow targeting specific documents
+PATCH /api/products?_id=507f1f77bcf86cd799439011  # Body: {"price": 99.99}
+✓ Allowed - _id is always allowed for writes
+
+PATCH /api/products?sku=PROD12345  # Body: {"price": 99.99}
+✓ Allowed - sku is in writeFilter (unique identifier)
+```
+
+### Real-World Example
+
+**Scenario**: Admin wants to update a user's role but accidentally filters by role instead of email:
+
+```bash
+# INTENDED (update specific user):
+PATCH /api/users?email=alice@example.com
+Body: {"role": "admin"}
+
+# ACCIDENTAL (would update ALL guest users):
+PATCH /api/users?role=guest
+Body: {"role": "admin"}
+```
+
+**With separate filters**:
+- `readFilter/role` = `$eq,$in` (allow querying by role)
+- `writeFilter/role` = NOT configured
+- **Result**: Second request is blocked, preventing disaster!
+
+### Configuration Guidelines
+
+**READ Filter - Be Permissive**:
+```bash
+# Allow complex queries for good UX
+zkCli.sh create /path/readFilter/status "\$eq,\$in"
+zkCli.sh create /path/readFilter/createdDate "\$gt,\$lt,\$gte,\$lte"
+zkCli.sh create /path/readFilter/category "\$eq,\$in"
+zkCli.sh create /path/readFilter/name "\$regex"
+```
+
+**WRITE Filter - Be Restrictive**:
+```bash
+# Only allow targeting by unique identifiers
+zkCli.sh create /path/writeFilter/email "\$eq"       # Unique
+zkCli.sh create /path/writeFilter/sku "\$eq"         # Unique
+# DON'T add: category, status, role, etc. (would allow mass updates)
+```
+
+**Golden Rule**: If a field appears in writeFilter, users can update/delete ALL documents matching that field value. Only add fields you trust users to filter by for bulk operations.
 
 ## Best Practices
 
@@ -418,17 +517,23 @@ zookeeper.base-path=/dev/myservice
 2. **Always set additionalProperties: false** in schemas for security
 3. **Configure only needed write methods** - principle of least privilege
 4. **Use required schemas for production** endpoints
-5. **Document field constraints** in schema descriptions
-6. **Use enums for known value sets**
-7. **Set sensible min/max constraints**
-8. **Index filterable fields** in MongoDB for performance
+5. **Separate read and write filters** - be permissive for reads, restrictive for writes
+6. **Write filters should only include unique identifiers** (_id, email, SKU, UUID)
+7. **Read filters can include any queryable fields** for good user experience
+8. **Document field constraints** in schema descriptions
+9. **Use enums for known value sets**
+10. **Set sensible min/max constraints**
+11. **Index filterable fields** in MongoDB for performance
 
 ## Security Considerations
 
-1. **Limit write methods** - only enable what's needed
-2. **Require schema validation** in production
-3. **Use strict schemas** - `additionalProperties: false`
-4. **Validate field formats** - email, URL, phone, etc.
-5. **Set size limits** - maxLength, maxItems, etc.
-6. **Filter sensitive fields** - don't allow filtering on passwords
-7. **Audit trail** - system automatically tracks with _lastRequestId
+1. **Separate read/write filters** - CRITICAL for preventing mass updates/deletes
+2. **Restrict write filters** - only _id and unique identifiers (email, SKU, UUID)
+3. **Limit write methods** - only enable what's needed
+4. **Require schema validation** in production
+5. **Use strict schemas** - `additionalProperties: false`
+6. **Validate field formats** - email, URL, phone, etc.
+7. **Set size limits** - maxLength, maxItems, etc.
+8. **Filter sensitive fields** - don't allow filtering on passwords or tokens
+9. **Audit trail** - system automatically tracks with _lastRequestId
+10. **Never add category/status/role to writeFilter** - enables dangerous mass operations

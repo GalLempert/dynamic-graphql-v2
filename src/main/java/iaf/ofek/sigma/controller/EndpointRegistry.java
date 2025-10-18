@@ -83,8 +83,9 @@ public class EndpointRegistry {
                 boolean sequenceEnabled = Boolean.parseBoolean(sequenceEnabledStr);
                 int defaultBulkSize = defaultBulkSizeStr != null ? Integer.parseInt(defaultBulkSizeStr) : 100;
 
-                // Load filter configuration
-                FilterConfig filterConfig = loadFilterConfig(name, endpointsBasePath);
+                // Load separate filter configurations for read and write operations
+                FilterConfig readFilterConfig = loadFilterConfig(name, endpointsBasePath, "readFilter");
+                FilterConfig writeFilterConfig = loadFilterConfig(name, endpointsBasePath, "writeFilter");
 
                 // Load schema reference
                 SchemaReference schemaReference = loadSchemaReference(name, endpointsBasePath);
@@ -100,7 +101,8 @@ public class EndpointRegistry {
                     Endpoint.EndpointType.fromString(type),
                     sequenceEnabled,
                     defaultBulkSize,
-                    filterConfig,
+                    readFilterConfig,
+                    writeFilterConfig,
                     schemaReference,
                     allowedWriteMethods
                 );
@@ -155,11 +157,15 @@ public class EndpointRegistry {
 
     /**
      * Loads filter configuration for an endpoint from Zookeeper
-     * Structure: /{ENV}/{SERVICE}/endpoints/{endpointName}/filter/{fieldName}
+     * Structure: /{ENV}/{SERVICE}/endpoints/{endpointName}/{filterType}/{fieldName}
      * Each field contains comma-separated operators: $eq,$gt,$lt
+     * 
+     * @param endpointName Name of the endpoint
+     * @param endpointsBasePath Base path for endpoints in ZooKeeper
+     * @param filterType "readFilter" or "writeFilter"
      */
-    private FilterConfig loadFilterConfig(String endpointName, String endpointsBasePath) {
-        String filterBasePath = endpointsBasePath + "/" + endpointName + "/filter";
+    private FilterConfig loadFilterConfig(String endpointName, String endpointsBasePath, String filterType) {
+        String filterBasePath = endpointsBasePath + "/" + endpointName + "/" + filterType;
         Map<String, byte[]> allConfig = configService.getAllConfiguration();
         Map<String, List<FilterOperator>> fieldOperators = new HashMap<>();
         boolean filterEnabled = false;

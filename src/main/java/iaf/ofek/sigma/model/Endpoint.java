@@ -18,12 +18,14 @@ public class Endpoint {
     private final EndpointType type;
     private final boolean sequenceEnabled;
     private final int defaultBulkSize;
-    private final FilterConfig filterConfig;
+    private final FilterConfig readFilterConfig;
+    private final FilterConfig writeFilterConfig;
     private final SchemaReference schemaReference;
     private final Set<String> allowedWriteMethods;
 
     public Endpoint(String name, String path, String httpMethod, String databaseCollection,
-                   EndpointType type, boolean sequenceEnabled, int defaultBulkSize, FilterConfig filterConfig,
+                   EndpointType type, boolean sequenceEnabled, int defaultBulkSize,
+                   FilterConfig readFilterConfig, FilterConfig writeFilterConfig,
                    SchemaReference schemaReference, Set<String> allowedWriteMethods) {
         this.name = name;
         this.path = path;
@@ -32,7 +34,8 @@ public class Endpoint {
         this.type = type;
         this.sequenceEnabled = sequenceEnabled;
         this.defaultBulkSize = defaultBulkSize;
-        this.filterConfig = filterConfig;
+        this.readFilterConfig = readFilterConfig;
+        this.writeFilterConfig = writeFilterConfig;
         this.schemaReference = schemaReference;
         this.allowedWriteMethods = allowedWriteMethods != null ? allowedWriteMethods : Set.of();
     }
@@ -65,8 +68,21 @@ public class Endpoint {
         return defaultBulkSize;
     }
 
-    public FilterConfig getFilterConfig() {
-        return filterConfig;
+    /**
+     * Gets the filter configuration for READ operations
+     * Read filters can be more permissive (allowing complex queries with $or, $in, etc.)
+     */
+    public FilterConfig getReadFilterConfig() {
+        return readFilterConfig;
+    }
+
+    /**
+     * Gets the filter configuration for WRITE operations
+     * Write filters should be more restrictive to prevent mass updates/deletes
+     * Typically limited to _id and unique identifier fields
+     */
+    public FilterConfig getWriteFilterConfig() {
+        return writeFilterConfig;
     }
 
     public SchemaReference getSchemaReference() {
@@ -108,7 +124,8 @@ public class Endpoint {
                 ", type=" + type +
                 ", sequenceEnabled=" + sequenceEnabled +
                 ", defaultBulkSize=" + defaultBulkSize +
-                ", filterConfig=" + filterConfig +
+                ", readFilterConfig=" + readFilterConfig +
+                ", writeFilterConfig=" + writeFilterConfig +
                 ", schemaReference=" + schemaReference +
                 ", allowedWriteMethods=" + allowedWriteMethods +
                 '}';

@@ -48,11 +48,11 @@ public class WriteValidator {
             return ValidationResult.failure(errors);
         }
 
-        // 2. Validate filter (if present)
+        // 2. Validate filter (if present) - using WRITE filter configuration
         if (request.getFilter() != null && !request.getFilter().isEmpty()) {
             List<String> filterErrors = filterValidator.validate(
                     request.getFilter(),
-                    endpoint.getFilterConfig()
+                    endpoint.getWriteFilterConfig()
             );
             errors.addAll(filterErrors);
         }
