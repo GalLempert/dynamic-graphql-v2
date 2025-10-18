@@ -1,6 +1,5 @@
 package iaf.ofek.sigma.format;
 
-import iaf.ofek.sigma.model.AuditFields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -10,24 +9,28 @@ import java.util.Map;
 
 /**
  * Service for formatting timestamps in response documents
- * 
+ *
  * Single Responsibility: Apply time format transformations to response data
  * Uses Strategy Pattern via TimeFormatRegistry
  */
 @Service
 public class ResponseTimeFormatter {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(ResponseTimeFormatter.class);
-    
+
+    // Spring Data audit field names
+    private static final String CREATED_AT = "createdAt";
+    private static final String LAST_MODIFIED_AT = "lastModifiedAt";
+
     private final TimeFormatRegistry registry;
-    
+
     public ResponseTimeFormatter(TimeFormatRegistry registry) {
         this.registry = registry;
     }
-    
+
     /**
      * Formats all timestamps in a single document according to the current request's preference
-     * 
+     *
      * @param document Document containing timestamp fields
      * @return Document with formatted timestamps
      */
@@ -35,14 +38,14 @@ public class ResponseTimeFormatter {
         if (document == null || document.isEmpty()) {
             return document;
         }
-        
+
         String requestedFormat = TimeFormatContext.getFormat();
         TimeFormatStrategy strategy = registry.getStrategy(requestedFormat);
-        
-        // Format audit fields if present
-        formatField(document, AuditFields.CREATED_AT, strategy);
-        formatField(document, AuditFields.UPDATED_AT, strategy);
-        
+
+        // Format Spring Data audit timestamp fields if present
+        formatField(document, CREATED_AT, strategy);
+        formatField(document, LAST_MODIFIED_AT, strategy);
+
         return document;
     }
     

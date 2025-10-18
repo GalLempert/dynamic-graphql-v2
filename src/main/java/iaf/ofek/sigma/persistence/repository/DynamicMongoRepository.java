@@ -6,6 +6,7 @@ import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.InsertManyResult;
 import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
+import iaf.ofek.sigma.model.DynamicDocument;
 import iaf.ofek.sigma.persistence.entity.SequenceCheckpoint;
 import org.bson.BsonDocument;
 import org.bson.BsonValue;
@@ -191,42 +192,42 @@ public class DynamicMongoRepository {
 
     /**
      * Inserts a single document into the collection
+     * Uses DynamicDocument for automatic audit field management
      *
      * @param collectionName The collection name
-     * @param document The document to insert
+     * @param document The DynamicDocument to insert
      * @return The ID of the inserted document
      */
-    public String insertOne(String collectionName, Map<String, Object> document) {
+    public String insertOne(String collectionName, DynamicDocument document) {
         logger.info("Inserting document into collection: {}", collectionName);
-        Document doc = new Document(document);
-        InsertOneResult result = mongoTemplate.getCollection(collectionName).insertOne(doc);
 
-        String insertedId = result.getInsertedId().asObjectId().getValue().toString();
-        logger.info("Successfully inserted document with id: {}", insertedId);
+        // Save using MongoTemplate - audit fields automatically populated by Spring Data
+        DynamicDocument saved = mongoTemplate.save(document, collectionName);
+
+        String insertedId = saved.getId();
+        logger.info("Successfully inserted document with id: {} (version: {})", insertedId, saved.getVersion());
         return insertedId;
     }
 
     /**
      * Inserts multiple documents into the collection (bulk insert)
+     * Uses DynamicDocument for automatic audit field management
      *
      * @param collectionName The collection name
-     * @param documents The documents to insert
+     * @param documents The DynamicDocuments to insert
      * @return List of IDs of inserted documents
      */
-    public List<String> insertMany(String collectionName, List<Map<String, Object>> documents) {
+    public List<String> insertMany(String collectionName, List<DynamicDocument> documents) {
         logger.info("Inserting {} documents into collection: {}", documents.size(), collectionName);
 
-        List<Document> docs = documents.stream()
-                .map(Document::new)
+        // Insert using MongoTemplate - audit fields automatically populated
+        List<DynamicDocument> savedDocs = (List<DynamicDocument>) mongoTemplate.insert(documents, collectionName);
+
+        List<String> insertedIds = savedDocs.stream()
+                .map(DynamicDocument::getId)
                 .collect(Collectors.toList());
 
-        InsertManyResult result = mongoTemplate.getCollection(collectionName).insertMany(docs);
-
-        List<String> insertedIds = result.getInsertedIds().values().stream()
-                .map(bsonValue -> bsonValue.asObjectId().getValue().toString())
-                .collect(Collectors.toList());
-
-        logger.info("Successfully inserted {} documents", insertedIds.size());
+        logger.info("Successfully inserted {} documents with audit fields", insertedIds.size());
         return insertedIds;
     }
 

@@ -10,10 +10,14 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.mongodb.config.AbstractMongoClientConfiguration;
+import org.springframework.data.mongodb.config.EnableMongoAuditing;
 import org.springframework.data.mongodb.repository.config.EnableMongoRepositories;
+import org.springframework.transaction.annotation.EnableTransactionManagement;
 
 @Configuration
 @EnableMongoRepositories(basePackages = "iaf.ofek.sigma.persistence.repository")
+@EnableMongoAuditing  // Enable Spring Data auditing for @CreatedDate, @LastModifiedDate, etc.
+@EnableTransactionManagement  // Enable @Transactional support for ACID operations
 public class MongoConfig extends AbstractMongoClientConfiguration {
 
     private static final Logger logger = LoggerFactory.getLogger(MongoConfig.class);
@@ -54,6 +58,26 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
                 .applyConnectionString(new ConnectionString(connectionString))
                 .build();
 
+        logger.info("MongoDB client created with ACID transaction support enabled");
         return MongoClients.create(settings);
+    }
+
+    /**
+     * Enable MongoDB transactions
+     * Note: Transactions require MongoDB 4.0+ with replica set
+     */
+    @Bean
+    public org.springframework.data.mongodb.MongoDatabaseFactory mongoDatabaseFactory() {
+        return super.mongoDatabaseFactory();
+    }
+
+    /**
+     * Enable transaction manager for @Transactional support
+     */
+    @Bean
+    public org.springframework.data.mongodb.MongoTransactionManager transactionManager(
+            org.springframework.data.mongodb.MongoDatabaseFactory dbFactory) {
+        logger.info("MongoDB transaction manager configured for ACID operations");
+        return new org.springframework.data.mongodb.MongoTransactionManager(dbFactory);
     }
 }

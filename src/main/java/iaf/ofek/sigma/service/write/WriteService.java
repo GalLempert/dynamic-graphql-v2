@@ -5,28 +5,36 @@ import com.mongodb.client.result.UpdateResult;
 import iaf.ofek.sigma.dto.request.*;
 import iaf.ofek.sigma.dto.response.*;
 import iaf.ofek.sigma.filter.FilterTranslator;
-import iaf.ofek.sigma.model.AuditFields;
+import iaf.ofek.sigma.model.DynamicDocument;
 import iaf.ofek.sigma.persistence.repository.DynamicMongoRepository;
 import org.bson.BsonValue;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Service for executing write operations
+ * Service for executing write operations with ACID transaction support
  *
  * Responsibilities:
  * - Execute CREATE, UPDATE, DELETE, UPSERT operations
  * - Inject audit fields automatically
  * - Translate filters to MongoDB queries
  * - Call repository layer
+ * - Ensure ACID properties via @Transactional
+ *
+ * All write methods are transactional - if any operation fails, the entire
+ * transaction will be rolled back to maintain data consistency.
+ *
+ * Note: MongoDB transactions require MongoDB 4.0+ with replica set configuration
  */
 @Service
+@Transactional  // All methods in this service run within a transaction by default
 public class WriteService {
 
     private static final Logger logger = LoggerFactory.getLogger(WriteService.class);
@@ -51,10 +59,12 @@ public class WriteService {
     /**
      * Executes CREATE operation
      * Made public for Template Method pattern
+     * Audit fields are automatically populated by Spring Data
      */
     public WriteResponse executeCreate(CreateRequest request, String collectionName) {
-        List<Map<String, Object>> documents = request.getDocuments().stream()
-                .map(doc -> AuditFields.injectForCreate(doc, request.getRequestId()))
+        // Convert Map to DynamicDocument - Spring Data will auto-populate audit fields
+        List<DynamicDocument> documents = request.getDocuments().stream()
+                .map(DynamicDocument::new)
                 .collect(Collectors.toList());
 
         if (request.isBulk()) {
@@ -69,6 +79,7 @@ public class WriteService {
     /**
      * Executes UPDATE operation
      * Made public for Template Method pattern
+     * lastModifiedAt and lastModifiedBy are automatically updated by Spring Data
      */
     public WriteResponse executeUpdate(UpdateRequest request, String collectionName) {
         // Translate filter to MongoDB query
@@ -76,17 +87,11 @@ public class WriteService {
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
         Query query = filterTranslator.translate(filterRequest);
 
-        // Inject audit fields into updates
-        Map<String, Object> updates = AuditFields.injectForUpdate(
-                request.getUpdates(),
-                request.getRequestId()
-        );
-
-        // Execute update
+        // Execute update - Spring Data will auto-update lastModifiedAt/lastModifiedBy
         UpdateResult result = repository.update(
                 collectionName,
                 query,
-                updates,
+                request.getUpdates(),
                 request.isUpdateMultiple()
         );
 
@@ -116,6 +121,7 @@ public class WriteService {
     /**
      * Executes UPSERT operation
      * Made public for Template Method pattern
+     * Audit fields automatically managed by Spring Data (createdAt if insert, lastModifiedAt if update)
      */
     public WriteResponse executeUpsert(UpsertRequest request, String collectionName) {
         // Translate filter to MongoDB query
@@ -123,14 +129,8 @@ public class WriteService {
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
         Query query = filterTranslator.translate(filterRequest);
 
-        // Inject audit fields (use injectForCreate as it may be a new document)
-        Map<String, Object> document = AuditFields.injectForCreate(
-                request.getDocument(),
-                request.getRequestId()
-        );
-
-        // Execute upsert
-        UpdateResult result = repository.upsert(collectionName, query, document);
+        // Execute upsert - Spring Data handles audit fields
+        UpdateResult result = repository.upsert(collectionName, query, request.getDocument());
 
         boolean wasInserted = result.getUpsertedId() != null;
         String documentId = wasInserted

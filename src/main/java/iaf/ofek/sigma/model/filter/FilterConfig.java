@@ -1,6 +1,5 @@
 package iaf.ofek.sigma.model.filter;
 
-import iaf.ofek.sigma.model.AuditFields;
 import lombok.Getter;
 
 import java.util.List;
@@ -17,6 +16,8 @@ import java.util.Map;
 @Getter
 public class FilterConfig {
 
+    private static final String MONGODB_ID_FIELD = "_id";
+
     private final Map<String, List<FilterOperator>> fieldOperators;
     private final boolean enabled;
 
@@ -31,7 +32,7 @@ public class FilterConfig {
      */
     public boolean isFieldFilterable(String fieldName) {
         // Primary key is always filterable
-        if (AuditFields.PRIMARY_KEY.equals(fieldName)) {
+        if (MONGODB_ID_FIELD.equals(fieldName)) {
             return true;
         }
         return fieldOperators.containsKey(fieldName);
@@ -43,7 +44,7 @@ public class FilterConfig {
      */
     public boolean isOperatorAllowed(String fieldName, FilterOperator operator) {
         // Primary key always allows $eq (equals) operator
-        if (AuditFields.PRIMARY_KEY.equals(fieldName) && operator == FilterOperator.EQ) {
+        if (MONGODB_ID_FIELD.equals(fieldName) && operator == FilterOperator.EQ) {
             return true;
         }
 
@@ -57,7 +58,7 @@ public class FilterConfig {
      */
     public List<FilterOperator> getAllowedOperators(String fieldName) {
         // Primary key always allows $eq operator
-        if (AuditFields.PRIMARY_KEY.equals(fieldName)) {
+        if (MONGODB_ID_FIELD.equals(fieldName)) {
             return List.of(FilterOperator.EQ);
         }
         return fieldOperators.get(fieldName);

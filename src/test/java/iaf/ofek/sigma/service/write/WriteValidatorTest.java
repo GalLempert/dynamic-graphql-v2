@@ -7,6 +7,7 @@ import iaf.ofek.sigma.dto.request.UpsertRequest;
 import iaf.ofek.sigma.dto.request.WriteRequest;
 import iaf.ofek.sigma.filter.FilterValidator;
 import iaf.ofek.sigma.model.Endpoint;
+import iaf.ofek.sigma.model.filter.FilterConfig;
 import iaf.ofek.sigma.model.schema.SchemaReference;
 import iaf.ofek.sigma.service.schema.SchemaValidator;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,16 +43,20 @@ class WriteValidatorTest {
     
     @Mock
     private Endpoint endpoint;
-    
+
     @Mock
     private SchemaReference schemaReference;
-    
+
+    @Mock
+    private FilterConfig writeFilterConfig;
+
     private WriteValidator writeValidator;
-    
+
     @BeforeEach
     void setUp() {
         writeValidator = new WriteValidator(filterValidator, schemaValidator);
         when(endpoint.getName()).thenReturn("test-endpoint");
+        when(endpoint.getWriteFilterConfig()).thenReturn(writeFilterConfig);
     }
     
     /**
@@ -243,17 +248,19 @@ class WriteValidatorTest {
      */
     @Test
     void testValidationFailsForInvalidFilter() {
-        // Given: Request with invalid filter
+        // Given: UpdateRequest with invalid filter
         Map<String, Object> filter = Map.of("invalidField", "value");
-        CreateRequest request = new CreateRequest(List.of(Map.of("name", "Alice")), "req-123");
-        
-        when(endpoint.isWriteMethodAllowed("POST")).thenReturn(true);
+        Map<String, Object> updates = Map.of("name", "Alice");
+        UpdateRequest request = new UpdateRequest(filter, updates, "req-123", false);
+
+        when(endpoint.isWriteMethodAllowed("PATCH")).thenReturn(true);
         when(endpoint.requiresSchemaValidation()).thenReturn(false);
-        when(filterValidator.validate(any(), any())).thenReturn(List.of("Invalid filter"));
-        
+        when(filterValidator.validate(eq(filter), eq(writeFilterConfig)))
+            .thenReturn(List.of("Invalid filter"));
+
         // When: Validate request
         WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
-        
+
         // Then: Should fail
         assertFalse(result.isValid());
         assertTrue(result.getErrors().contains("Invalid filter"));
@@ -294,19 +301,45 @@ class WriteValidatorTest {
     void testEmptyFilterIsAllowed() {
         // Given: Request with no filter
         CreateRequest request = new CreateRequest(List.of(Map.of("name", "Alice")), "req-123");
-        
+
         when(endpoint.isWriteMethodAllowed("POST")).thenReturn(true);
         when(endpoint.requiresSchemaValidation()).thenReturn(true);
         when(endpoint.getSchemaReference()).thenReturn(schemaReference);
         when(schemaReference.getSchemaName()).thenReturn("schema");
         when(schemaValidator.validateBulk(anyList(), anyString()))
             .thenReturn(SchemaValidator.ValidationResult.success());
-        
+
         // When: Validate request
         WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
-        
+
         // Then: Should succeed without filter validation
         assertTrue(result.isValid());
         verify(filterValidator, never()).validate(any(), any());
+    }
+
+    /**
+     * Tests that WRITE filter config is used (not READ filter config)
+     *
+     * Security feature: Write operations use writeFilterConfig which should
+     * be more restrictive to prevent mass updates/deletes
+     */
+    @Test
+    void testUsesWriteFilterConfigNotReadFilterConfig() {
+        // Given: DELETE request with filter
+        Map<String, Object> filter = Map.of("status", "inactive");
+        DeleteRequest request = new DeleteRequest(filter, "req-123", true);
+
+        when(endpoint.isWriteMethodAllowed("DELETE")).thenReturn(true);
+        when(filterValidator.validate(eq(filter), eq(writeFilterConfig)))
+            .thenReturn(List.of());
+
+        // When: Validate request
+        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+
+        // Then: Should use WRITE filter config, not READ filter config
+        assertTrue(result.isValid());
+        verify(endpoint).getWriteFilterConfig();  // Should call getWriteFilterConfig()
+        verify(endpoint, never()).getReadFilterConfig();  // Should NOT call getReadFilterConfig()
+        verify(filterValidator).validate(eq(filter), eq(writeFilterConfig));  // Use write config
     }
 }
