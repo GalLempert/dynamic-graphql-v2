@@ -19,6 +19,14 @@ This application dynamically creates API endpoints based on configurations store
 - Endpoints configured entirely through ZooKeeper
 - Supports multiple endpoint types: REST, GraphQL (extensible to gRPC, WebSocket)
 
+### ✍️ Write Operations (CREATE, UPDATE, DELETE, UPSERT)
+- Full CRUD support with HTTP method mapping (POST, PATCH, DELETE, PUT)
+- JSON Schema validation for data integrity
+- Automatic audit field injection (`_createdAt`, `_updatedAt`, `_lastRequestId`)
+- Filter support in write operations
+- Primary key (_id) always accessible for single-document operations
+- Bulk insert support
+
 ### 🔍 Advanced Filtering
 - MongoDB-style query operators (`$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$and`, `$or`, etc.)
 - Logical operators for complex queries
@@ -32,6 +40,7 @@ This application dynamically creates API endpoints based on configurations store
 - Field projection support
 
 ### 🔒 Configuration-Based Validation
+- JSON Schema validation for write operations
 - Field-level filtering rules
 - Operator allowlists per field
 - Automatic request validation
@@ -55,10 +64,12 @@ This application dynamically creates API endpoints based on configurations store
                ↓
 ┌─────────────────────────────────────────┐
 │  Service Layer (Business Logic)         │
-│  QueryOrchestrator - Reusable! ⭐       │
+│  Orchestrator - Reusable! ⭐             │
 │  ├─ RequestValidator                    │
 │  ├─ QueryService                        │
-│  └─ QueryBuilder                        │
+│  ├─ WriteValidator                      │
+│  ├─ WriteService                        │
+│  └─ SchemaValidator                     │
 └──────────────┬──────────────────────────┘
                ↓
 ┌─────────────────────────────────────────┐
@@ -72,19 +83,15 @@ This application dynamically creates API endpoints based on configurations store
 ### Request Flow
 
 ```
-HTTP Request
+HTTP Request (GET, POST, PUT, PATCH, DELETE)
     ↓
-RestApiController (25 lines - thin adapter)
+RestApiController (thin adapter)
     ↓
-RequestParser (deserialize HTTP → DTO)
+RequestParser (deserialize HTTP → QueryRequest or WriteRequest DTO)
     ↓
-QueryOrchestrator (validate + execute)
-    ↓
-QueryService (execute query)
-    ↓
-DynamicMongoRepository
-    ↓
-MongoDB
+Orchestrator (validate + execute)
+    ├─ READ: QueryService → MongoDB
+    └─ WRITE: SchemaValidator → WriteService → MongoDB
     ↓
 ResponseBuilder (format DTO → HTTP)
     ↓
@@ -95,15 +102,22 @@ HTTP Response
 
 ```
 /{ENV}/{SERVICE}/
+├── schemas/                        # JSON Schemas for validation
+│   ├── base-types                  # Common type definitions
+│   ├── user-schema                 # User documents
+│   └── product-schema              # Product documents
+│
 ├── endpoints/
 │   └── {endpointName}/
 │       ├── path                    # e.g., "/products"
-│       ├── httpMethod              # e.g., "GET,POST"
+│       ├── httpMethod              # e.g., "GET"
 │       ├── databaseCollection      # e.g., "products"
 │       ├── type                    # REST or GRAPHQL
 │       ├── sequenceEnabled         # true/false
 │       ├── defaultBulkSize         # e.g., 100
-│       └── filter/                 # Optional filtering rules
+│       ├── writeMethods            # e.g., "POST,PUT,PATCH,DELETE"
+│       ├── schema                  # e.g., "product-schema:required"
+│       └── filter/                 # Filtering rules (_id always allowed)
 │           ├── {fieldName1}        # e.g., "price" → "$eq,$gt,$gte,$lt,$lte"
 │           ├── {fieldName2}        # e.g., "category" → "$eq,$in"
 │           └── {fieldName3}        # e.g., "name" → "$eq,$regex"
@@ -168,6 +182,50 @@ GET /api/products?sequence=12345&bulkSize=100
 ```
 Returns changes since sequence 12345, using MongoDB Change Streams.
 
+### 6. CREATE - Insert New Document (POST)
+```bash
+POST /api/users
+Content-Type: application/json
+X-Request-ID: req-123
+
+{
+  "name": "Alice",
+  "email": "alice@example.com",
+  "age": 30
+}
+```
+Creates a new user. Audit fields (`_createdAt`, `_updatedAt`, `_lastRequestId`) are automatically added.
+
+### 7. UPDATE - Update by Filter (PATCH)
+```bash
+PATCH /api/users?_id=507f1f77bcf86cd799439011
+Content-Type: application/json
+
+{
+  "age": 31
+}
+```
+Updates user with specified _id. Only provided fields are updated.
+
+### 8. DELETE - Delete by Filter (DELETE)
+```bash
+DELETE /api/users?role=guest
+```
+Deletes all users with role "guest".
+
+### 9. UPSERT - Update or Insert (PUT)
+```bash
+PUT /api/users?email=alice@example.com
+Content-Type: application/json
+
+{
+  "name": "Alice Updated",
+  "email": "alice@example.com",
+  "age": 31
+}
+```
+Updates if user with email exists, creates new user if not.
+
 ## Supported Filter Operators
 
 | Operator | Description | Example |
@@ -190,11 +248,12 @@ Returns changes since sequence 12345, using MongoDB Change Streams.
 
 ## Technology Stack
 
-- **Java 21** - Modern Java features
-- **Spring Boot 3** - Application framework
+- **Java 25** - Modern Java features
+- **Spring Boot 3.5** - Application framework
 - **Spring Data MongoDB** - MongoDB integration with Change Streams
 - **Netflix DGS** - GraphQL framework (ready for integration)
 - **Apache ZooKeeper** - Dynamic configuration storage
+- **JSON Schema Validator** - Document validation (networknt library)
 - **Jackson** - JSON serialization/deserialization
 - **Micrometer** - Observability and metrics
 - **Spring Boot Actuator** - Health checks and monitoring
@@ -228,29 +287,34 @@ FilterNode
 **Benefit:** Natural representation of nested filters
 
 ### 3. Protocol-Agnostic Service Layer
-The `QueryOrchestrator` contains all business logic and is reusable:
+The `Orchestrator` contains all business logic (read + write) and is reusable:
 ```java
 // REST Controller
-QueryResponse response = queryOrchestrator.execute(httpRequest, endpoint);
+QueryResponse response = orchestrator.executeQuery(httpRequest, endpoint);
+WriteResponse response = orchestrator.executeWrite(httpRequest, endpoint);
 
-// GraphQL Controller
-QueryResponse response = queryOrchestrator.execute(graphqlRequest, endpoint);
+// GraphQL Controller (future)
+QueryResponse response = orchestrator.executeQuery(graphqlRequest, endpoint);
 
 // gRPC Service (future)
-QueryResponse response = queryOrchestrator.execute(grpcRequest, endpoint);
+QueryResponse response = orchestrator.executeQuery(grpcRequest, endpoint);
 ```
 **Benefit:** Write business logic once, use across all protocols
 
 ### 4. Type-Safe DTOs
 Strongly-typed request and response objects:
 ```java
-interface QueryRequest {
-    QueryType getType();
-}
-
+// Read operations
+interface QueryRequest { QueryType getType(); }
 class FilteredQueryRequest implements QueryRequest
 class SequenceQueryRequest implements QueryRequest
-class FullCollectionRequest implements QueryRequest
+
+// Write operations
+interface WriteRequest { WriteType getType(); }
+class CreateRequest implements WriteRequest
+class UpdateRequest implements WriteRequest
+class DeleteRequest implements WriteRequest
+class UpsertRequest implements WriteRequest
 ```
 **Benefit:** Compile-time safety, IDE support, no String/Map soup
 
@@ -406,12 +470,19 @@ curl http://localhost:8080/actuator/health
 
 Comprehensive documentation is available in the `docs/` folder:
 
-- **[README_REFACTORING.md](docs/README_REFACTORING.md)** - Quick refactoring summary
-- **[FINAL_ARCHITECTURE.md](docs/FINAL_ARCHITECTURE.md)** - Complete architecture guide
-- **[REUSE_EXAMPLE.md](docs/REUSE_EXAMPLE.md)** - Protocol reusability examples
+### Core Documentation
+- **[WRITE_FEATURE.md](docs/WRITE_FEATURE.md)** - ⭐ Complete write operations guide (CREATE, UPDATE, DELETE, UPSERT)
+- **[ZOOKEEPER_SETUP.md](docs/ZOOKEEPER_SETUP.md)** - ⭐ ZooKeeper configuration with JSON Schema examples
 - **[FILTER_FEATURE.md](docs/FILTER_FEATURE.md)** - Filter feature documentation
+- **[FINAL_ARCHITECTURE.md](docs/FINAL_ARCHITECTURE.md)** - Complete architecture guide
+
+### Architecture Documentation
 - **[ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md)** - Visual architecture diagrams
 - **[ARCHITECTURE_REFACTORING.md](docs/ARCHITECTURE_REFACTORING.md)** - Detailed refactoring analysis
+- **[REUSE_EXAMPLE.md](docs/REUSE_EXAMPLE.md)** - Protocol reusability examples
+
+### Refactoring Documentation
+- **[README_REFACTORING.md](docs/README_REFACTORING.md)** - Quick refactoring summary
 - **[REFACTORING_SUMMARY.md](docs/REFACTORING_SUMMARY.md)** - Filter refactoring summary
 - **[REFACTORING_COMPLETE.md](docs/REFACTORING_COMPLETE.md)** - Complete implementation guide
 

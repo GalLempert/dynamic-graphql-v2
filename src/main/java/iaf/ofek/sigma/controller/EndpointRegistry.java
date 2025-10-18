@@ -4,6 +4,7 @@ import iaf.ofek.sigma.config.properties.ZookeeperConfigProperties;
 import iaf.ofek.sigma.model.Endpoint;
 import iaf.ofek.sigma.model.filter.FilterConfig;
 import iaf.ofek.sigma.model.filter.FilterOperator;
+import iaf.ofek.sigma.model.schema.SchemaReference;
 import iaf.ofek.sigma.zookeeper.ZookeeperConfigService;
 import iaf.ofek.sigma.zookeeper.util.ZookeeperUtils;
 import jakarta.annotation.PostConstruct;
@@ -85,6 +86,12 @@ public class EndpointRegistry {
                 // Load filter configuration
                 FilterConfig filterConfig = loadFilterConfig(name, endpointsBasePath);
 
+                // Load schema reference
+                SchemaReference schemaReference = loadSchemaReference(name, endpointsBasePath);
+
+                // Load allowed write methods
+                Set<String> allowedWriteMethods = loadAllowedWriteMethods(name, endpointsBasePath);
+
                 Endpoint endpoint = new Endpoint(
                     name,
                     path,
@@ -93,7 +100,9 @@ public class EndpointRegistry {
                     Endpoint.EndpointType.fromString(type),
                     sequenceEnabled,
                     defaultBulkSize,
-                    filterConfig
+                    filterConfig,
+                    schemaReference,
+                    allowedWriteMethods
                 );
 
                 String cacheKey = endpoint.getCacheKey();
@@ -180,5 +189,64 @@ public class EndpointRegistry {
             logger.info("Filter enabled for endpoint: {} with {} filterable fields", endpointName, fieldOperators.size());
         }
         return config;
+    }
+
+    /**
+     * Loads schema reference for an endpoint from Zookeeper
+     * Structure: /{ENV}/{SERVICE}/endpoints/{endpointName}/schema
+     * Value format: "schemaName" or "schemaName:required"
+     */
+    private SchemaReference loadSchemaReference(String endpointName, String endpointsBasePath) {
+        String schemaPath = endpointsBasePath + "/" + endpointName + "/schema";
+        Map<String, byte[]> allConfig = configService.getAllConfiguration();
+
+        byte[] schemaData = allConfig.get(schemaPath);
+        if (schemaData == null) {
+            return null; // No schema configured
+        }
+
+        String schemaValue = ZookeeperUtils.bytesToString(schemaData).orElse("");
+        if (schemaValue.isEmpty()) {
+            return null;
+        }
+
+        // Parse format: "schemaName" or "schemaName:required"
+        String[] parts = schemaValue.split(":");
+        String schemaName = parts[0].trim();
+        boolean required = parts.length > 1 && "required".equalsIgnoreCase(parts[1].trim());
+
+        SchemaReference schemaReference = new SchemaReference(schemaName, required);
+        logger.info("Loaded schema reference for endpoint {}: {}", endpointName, schemaReference);
+        return schemaReference;
+    }
+
+    /**
+     * Loads allowed write methods for an endpoint from Zookeeper
+     * Structure: /{ENV}/{SERVICE}/endpoints/{endpointName}/writeMethods
+     * Value format: comma-separated HTTP methods: "POST,PUT,PATCH,DELETE"
+     */
+    private Set<String> loadAllowedWriteMethods(String endpointName, String endpointsBasePath) {
+        String writeMethodsPath = endpointsBasePath + "/" + endpointName + "/writeMethods";
+        Map<String, byte[]> allConfig = configService.getAllConfiguration();
+
+        byte[] writeMethodsData = allConfig.get(writeMethodsPath);
+        if (writeMethodsData == null) {
+            return Set.of(); // No write methods configured
+        }
+
+        String writeMethodsValue = ZookeeperUtils.bytesToString(writeMethodsData).orElse("");
+        if (writeMethodsValue.isEmpty()) {
+            return Set.of();
+        }
+
+        // Parse comma-separated methods
+        Set<String> methods = Arrays.stream(writeMethodsValue.split(","))
+                .map(String::trim)
+                .map(String::toUpperCase)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toSet());
+
+        logger.info("Loaded write methods for endpoint {}: {}", endpointName, methods);
+        return methods;
     }
 }

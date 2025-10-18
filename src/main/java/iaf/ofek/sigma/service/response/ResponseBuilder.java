@@ -1,9 +1,6 @@
 package iaf.ofek.sigma.service.response;
 
-import iaf.ofek.sigma.dto.response.DocumentListResponse;
-import iaf.ofek.sigma.dto.response.ErrorResponse;
-import iaf.ofek.sigma.dto.response.QueryResponse;
-import iaf.ofek.sigma.dto.response.SequenceResponse;
+import iaf.ofek.sigma.dto.response.*;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -12,7 +9,7 @@ import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Builds HTTP ResponseEntity objects from QueryResponse objects
+ * Builds HTTP ResponseEntity objects from QueryResponse and WriteResponse objects
  * Single Responsibility: Response formatting
  */
 @Service
@@ -89,5 +86,116 @@ public class ResponseBuilder {
     public ResponseEntity<?> buildError(String message) {
         ErrorResponse errorResponse = new ErrorResponse(message);
         return buildErrorResponse(errorResponse);
+    }
+
+    // ========== WRITE RESPONSE METHODS ==========
+
+    /**
+     * Builds an HTTP response from a write response (or error)
+     *
+     * @param response The write response or error response
+     * @return HTTP ResponseEntity
+     */
+    public ResponseEntity<?> buildWrite(Object response) {
+        // Handle error responses
+        if (response instanceof ErrorResponse errorResponse) {
+            return buildErrorResponse(errorResponse);
+        }
+
+        // Handle write responses
+        if (response instanceof WriteResponse writeResponse) {
+            return buildWriteResponse(writeResponse);
+        }
+
+        // Unknown response type
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Unknown response type");
+    }
+
+    /**
+     * Builds response for write operations
+     */
+    private ResponseEntity<?> buildWriteResponse(WriteResponse response) {
+        if (response instanceof CreateResponse createResponse) {
+            return buildCreateResponse(createResponse);
+        }
+
+        if (response instanceof UpdateResponse updateResponse) {
+            return buildUpdateResponse(updateResponse);
+        }
+
+        if (response instanceof DeleteResponse deleteResponse) {
+            return buildDeleteResponse(deleteResponse);
+        }
+
+        if (response instanceof UpsertResponse upsertResponse) {
+            return buildUpsertResponse(upsertResponse);
+        }
+
+        // Unknown write response type
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body("Unknown write response type");
+    }
+
+    /**
+     * Builds response for CREATE operation
+     */
+    private ResponseEntity<?> buildCreateResponse(CreateResponse response) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("type", "CREATE");
+        body.put("success", response.isSuccess());
+        body.put("affectedCount", response.getAffectedCount());
+        body.put("insertedIds", response.getInsertedIds());
+        body.put("insertedCount", response.getInsertedCount());
+
+        return ResponseEntity.status(HttpStatus.CREATED).body(body);
+    }
+
+    /**
+     * Builds response for UPDATE operation
+     */
+    private ResponseEntity<?> buildUpdateResponse(UpdateResponse response) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("type", "UPDATE");
+        body.put("success", response.isSuccess());
+        body.put("affectedCount", response.getAffectedCount());
+        body.put("matchedCount", response.getMatchedCount());
+        body.put("modifiedCount", response.getModifiedCount());
+
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Builds response for DELETE operation
+     */
+    private ResponseEntity<?> buildDeleteResponse(DeleteResponse response) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("type", "DELETE");
+        body.put("success", response.isSuccess());
+        body.put("affectedCount", response.getAffectedCount());
+        body.put("deletedCount", response.getDeletedCount());
+
+        return ResponseEntity.ok(body);
+    }
+
+    /**
+     * Builds response for UPSERT operation
+     */
+    private ResponseEntity<?> buildUpsertResponse(UpsertResponse response) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("type", "UPSERT");
+        body.put("success", response.isSuccess());
+        body.put("affectedCount", response.getAffectedCount());
+        body.put("wasInserted", response.wasInserted());
+
+        if (response.wasInserted()) {
+            body.put("documentId", response.getDocumentId());
+        } else {
+            body.put("matchedCount", response.getMatchedCount());
+            body.put("modifiedCount", response.getModifiedCount());
+        }
+
+        HttpStatus status = response.wasInserted() ? HttpStatus.CREATED : HttpStatus.OK;
+        return ResponseEntity.status(status).body(body);
     }
 }

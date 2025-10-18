@@ -1,6 +1,9 @@
 package iaf.ofek.sigma.model;
 
 import iaf.ofek.sigma.model.filter.FilterConfig;
+import iaf.ofek.sigma.model.schema.SchemaReference;
+
+import java.util.Set;
 
 /**
  * Represents a dynamic endpoint configuration from Zookeeper
@@ -16,9 +19,12 @@ public class Endpoint {
     private final boolean sequenceEnabled;
     private final int defaultBulkSize;
     private final FilterConfig filterConfig;
+    private final SchemaReference schemaReference;
+    private final Set<String> allowedWriteMethods;
 
     public Endpoint(String name, String path, String httpMethod, String databaseCollection,
-                   EndpointType type, boolean sequenceEnabled, int defaultBulkSize, FilterConfig filterConfig) {
+                   EndpointType type, boolean sequenceEnabled, int defaultBulkSize, FilterConfig filterConfig,
+                   SchemaReference schemaReference, Set<String> allowedWriteMethods) {
         this.name = name;
         this.path = path;
         this.httpMethod = httpMethod;
@@ -27,6 +33,8 @@ public class Endpoint {
         this.sequenceEnabled = sequenceEnabled;
         this.defaultBulkSize = defaultBulkSize;
         this.filterConfig = filterConfig;
+        this.schemaReference = schemaReference;
+        this.allowedWriteMethods = allowedWriteMethods != null ? allowedWriteMethods : Set.of();
     }
 
     public String getName() {
@@ -61,6 +69,28 @@ public class Endpoint {
         return filterConfig;
     }
 
+    public SchemaReference getSchemaReference() {
+        return schemaReference;
+    }
+
+    public Set<String> getAllowedWriteMethods() {
+        return allowedWriteMethods;
+    }
+
+    /**
+     * Checks if a specific HTTP method is allowed for write operations
+     */
+    public boolean isWriteMethodAllowed(String method) {
+        return allowedWriteMethods.contains(method.toUpperCase());
+    }
+
+    /**
+     * Checks if this endpoint requires schema validation for writes
+     */
+    public boolean requiresSchemaValidation() {
+        return schemaReference != null && schemaReference.isRequired();
+    }
+
     /**
      * Creates a cache key for this endpoint (path + method)
      */
@@ -79,6 +109,8 @@ public class Endpoint {
                 ", sequenceEnabled=" + sequenceEnabled +
                 ", defaultBulkSize=" + defaultBulkSize +
                 ", filterConfig=" + filterConfig +
+                ", schemaReference=" + schemaReference +
+                ", allowedWriteMethods=" + allowedWriteMethods +
                 '}';
     }
 
