@@ -62,9 +62,13 @@ public class WriteService {
      * Audit fields are automatically populated by Spring Data
      */
     public WriteResponse executeCreate(CreateRequest request, String collectionName) {
-        // Convert Map to DynamicDocument - Spring Data will auto-populate audit fields
+        // Convert Map to DynamicDocument and set request ID
         List<DynamicDocument> documents = request.getDocuments().stream()
-                .map(DynamicDocument::new)
+                .map(doc -> {
+                    DynamicDocument dynamicDoc = new DynamicDocument(doc);
+                    dynamicDoc.setLatestRequestId(request.getRequestId());
+                    return dynamicDoc;
+                })
                 .collect(Collectors.toList());
 
         if (request.isBulk()) {
@@ -87,11 +91,15 @@ public class WriteService {
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
         Query query = filterTranslator.translate(filterRequest);
 
+        // Add latestRequestId to updates
+        Map<String, Object> updates = new java.util.HashMap<>(request.getUpdates());
+        updates.put("latestRequestId", request.getRequestId());
+
         // Execute update - Spring Data will auto-update lastModifiedAt/lastModifiedBy
         UpdateResult result = repository.update(
                 collectionName,
                 query,
-                request.getUpdates(),
+                updates,
                 request.isUpdateMultiple()
         );
 
@@ -129,8 +137,12 @@ public class WriteService {
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
         Query query = filterTranslator.translate(filterRequest);
 
+        // Add latestRequestId to document
+        Map<String, Object> document = new java.util.HashMap<>(request.getDocument());
+        document.put("latestRequestId", request.getRequestId());
+
         // Execute upsert - Spring Data handles audit fields
-        UpdateResult result = repository.upsert(collectionName, query, request.getDocument());
+        UpdateResult result = repository.upsert(collectionName, query, document);
 
         boolean wasInserted = result.getUpsertedId() != null;
         String documentId = wasInserted
