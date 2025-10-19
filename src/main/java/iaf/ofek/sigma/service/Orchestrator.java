@@ -6,6 +6,7 @@ import iaf.ofek.sigma.dto.response.ErrorResponse;
 import iaf.ofek.sigma.dto.response.QueryResponse;
 import iaf.ofek.sigma.dto.response.WriteResponse;
 import iaf.ofek.sigma.model.Endpoint;
+import iaf.ofek.sigma.service.enums.EnumResponseTransformer;
 import iaf.ofek.sigma.service.query.QueryService;
 import iaf.ofek.sigma.service.validation.RequestValidator;
 import iaf.ofek.sigma.service.write.WriteService;
@@ -42,15 +43,18 @@ public class Orchestrator {
     private final QueryService queryService;
     private final WriteValidator writeValidator;
     private final WriteService writeService;
+    private final EnumResponseTransformer enumResponseTransformer;
 
     public Orchestrator(RequestValidator requestValidator,
                        QueryService queryService,
                        WriteValidator writeValidator,
-                       WriteService writeService) {
+                       WriteService writeService,
+                       EnumResponseTransformer enumResponseTransformer) {
         this.requestValidator = requestValidator;
         this.queryService = queryService;
         this.writeValidator = writeValidator;
         this.writeService = writeService;
+        this.enumResponseTransformer = enumResponseTransformer;
     }
 
     /**
@@ -81,6 +85,7 @@ public class Orchestrator {
 
             // 2. Execute query
             QueryResponse response = queryService.execute(request, endpoint.getDatabaseCollection());
+            response = enumResponseTransformer.transform(response, endpoint);
 
             logger.info("Query executed successfully: {} documents/results", getResponseSize(response));
             return response;

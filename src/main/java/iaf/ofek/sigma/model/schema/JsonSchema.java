@@ -1,6 +1,9 @@
 package iaf.ofek.sigma.model.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import iaf.ofek.sigma.model.enums.EnumFieldBinding;
+
+import java.util.List;
 
 /**
  * Represents a JSON Schema for document validation
@@ -20,10 +23,12 @@ public class JsonSchema {
 
     private final String name;
     private final JsonNode schema;
+    private final List<EnumFieldBinding> enumBindings;
 
-    public JsonSchema(String name, JsonNode schema) {
+    public JsonSchema(String name, JsonNode schema, List<EnumFieldBinding> enumBindings) {
         this.name = name;
         this.schema = schema;
+        this.enumBindings = enumBindings;
     }
 
     public String getName() {
@@ -32,6 +37,10 @@ public class JsonSchema {
 
     public JsonNode getSchema() {
         return schema;
+    }
+
+    public List<EnumFieldBinding> getEnumBindings() {
+        return enumBindings;
     }
 
     /**
@@ -46,6 +55,7 @@ public class JsonSchema {
         return "JsonSchema{" +
                 "name='" + name + '\'' +
                 ", schema=" + schema +
+                ", enumBindings=" + enumBindings +
                 '}';
     }
 }
