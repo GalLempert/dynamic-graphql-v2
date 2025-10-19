@@ -35,10 +35,19 @@ public class WriteService {
 
     private final DynamicMongoRepository repository;
     private final FilterTranslator filterTranslator;
+    private final ThreadLocal<Endpoint> endpointContext = new ThreadLocal<>();
 
     public WriteService(DynamicMongoRepository repository, FilterTranslator filterTranslator) {
         this.repository = repository;
         this.filterTranslator = filterTranslator;
+    }
+
+    private Endpoint requireEndpointContext() {
+        Endpoint endpoint = endpointContext.get();
+        if (endpoint == null) {
+            throw new IllegalStateException("Endpoint context is not available for the current write operation");
+        }
+        return endpoint;
     }
 
     /**
@@ -47,14 +56,19 @@ public class WriteService {
     public WriteResponse execute(WriteRequest request, Endpoint endpoint) {
         logger.info("Executing {} operation on endpoint: {} -> collection: {}",
                 request.getType(), endpoint.getName(), endpoint.getDatabaseCollection());
-        return request.execute(this, endpoint);
+        endpointContext.set(endpoint);
+        try {
+            return request.execute(this, endpoint.getDatabaseCollection());
+        } finally {
+            endpointContext.remove();
+        }
     }
 
     /**
      * Executes CREATE operation
      */
-    public WriteResponse executeCreate(CreateRequest request, Endpoint endpoint) {
-        String collectionName = endpoint.getDatabaseCollection();
+    public WriteResponse executeCreate(CreateRequest request, String collectionName) {
+        Endpoint endpoint = requireEndpointContext();
         Set<String> subEntities = endpoint.getSubEntities();
 
         List<DynamicDocument> documents = request.getDocuments().stream()
@@ -80,8 +94,8 @@ public class WriteService {
     /**
      * Executes UPDATE operation
      */
-    public WriteResponse executeUpdate(UpdateRequest request, Endpoint endpoint) {
-        String collectionName = endpoint.getDatabaseCollection();
+    public WriteResponse executeUpdate(UpdateRequest request, String collectionName) {
+        Endpoint endpoint = requireEndpointContext();
 
         iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
@@ -98,8 +112,7 @@ public class WriteService {
     /**
      * Executes DELETE operation (logical delete)
      */
-    public WriteResponse executeDelete(DeleteRequest request, Endpoint endpoint) {
-        String collectionName = endpoint.getDatabaseCollection();
+    public WriteResponse executeDelete(DeleteRequest request, String collectionName) {
 
         iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
@@ -112,8 +125,8 @@ public class WriteService {
     /**
      * Executes UPSERT operation
      */
-    public WriteResponse executeUpsert(UpsertRequest request, Endpoint endpoint) {
-        String collectionName = endpoint.getDatabaseCollection();
+    public WriteResponse executeUpsert(UpsertRequest request, String collectionName) {
+        Endpoint endpoint = requireEndpointContext();
 
         iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
