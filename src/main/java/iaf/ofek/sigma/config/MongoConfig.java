@@ -63,16 +63,8 @@ public class MongoConfig extends AbstractMongoClientConfiguration {
     }
 
     /**
-     * Enable MongoDB transactions
-     * Note: Transactions require MongoDB 4.0+ with replica set
-     */
-    @Bean
-    public org.springframework.data.mongodb.MongoDatabaseFactory mongoDatabaseFactory() {
-        return super.mongoDatabaseFactory();
-    }
-
-    /**
      * Enable transaction manager for @Transactional support
+     * Note: Transactions require MongoDB 4.0+ with replica set
      */
     @Bean
     public org.springframework.data.mongodb.MongoTransactionManager transactionManager(
