@@ -67,4 +67,10 @@ public abstract class AuditableBaseDocument {
      * Must be manually set in service layer (not managed by Spring Data)
      */
     private String latestRequestId;
+
+    /**
+     * Logical deletion flag
+     * When true, document should be treated as deleted without removing it physically
+     */
+    private boolean isDeleted = false;
 }

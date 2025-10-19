@@ -122,7 +122,7 @@ public class Orchestrator {
             }
 
             // 2. Execute write
-            WriteResponse response = writeService.execute(request, endpoint.getDatabaseCollection());
+            WriteResponse response = writeService.execute(request, endpoint);
 
             logger.info("Write executed successfully: {} affected", response.getAffectedCount());
             return response;

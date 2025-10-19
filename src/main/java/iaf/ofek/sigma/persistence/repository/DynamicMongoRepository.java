@@ -51,7 +51,8 @@ public class DynamicMongoRepository {
      */
     public List<Document> findAll(String collectionName) {
         logger.debug("Querying all documents from collection: {}", collectionName);
-        return mongoTemplate.findAll(Document.class, collectionName);
+        Query query = applyNotDeletedFilter(new Query());
+        return mongoTemplate.find(query, Document.class, collectionName);
     }
 
     /**
@@ -60,7 +61,8 @@ public class DynamicMongoRepository {
      */
     public List<Document> findWithQuery(String collectionName, Query query) {
         logger.debug("Executing query on collection {}: {}", collectionName, query);
-        return mongoTemplate.find(query, Document.class, collectionName);
+        Query safeQuery = applyNotDeletedFilter(query);
+        return mongoTemplate.find(safeQuery, Document.class, collectionName);
     }
 
     /**
@@ -233,11 +235,13 @@ public class DynamicMongoRepository {
         Update update = new Update();
         updates.forEach(update::set);
 
+        Query safeQuery = applyNotDeletedFilter(query);
+
         UpdateResult result;
         if (updateMultiple) {
-            result = mongoTemplate.updateMulti(query, update, collectionName);
+            result = mongoTemplate.updateMulti(safeQuery, update, collectionName);
         } else {
-            result = mongoTemplate.updateFirst(query, update, collectionName);
+            result = mongoTemplate.updateFirst(safeQuery, update, collectionName);
         }
 
         logger.info("Update result: matched={}, modified={}", result.getMatchedCount(), result.getModifiedCount());
@@ -259,7 +263,9 @@ public class DynamicMongoRepository {
         Update update = new Update();
         document.forEach(update::set);
 
-        UpdateResult result = mongoTemplate.upsert(query, update, collectionName);
+        Query safeQuery = applyNotDeletedFilter(query);
+
+        UpdateResult result = mongoTemplate.upsert(safeQuery, update, collectionName);
 
         if (result.getUpsertedId() != null) {
             logger.info("Upserted new document with id: {}", result.getUpsertedId());
@@ -279,18 +285,38 @@ public class DynamicMongoRepository {
      * @param deleteMultiple Whether to delete all matching documents or just the first
      * @return DeleteResult containing the count of deleted documents
      */
-    public DeleteResult delete(String collectionName, Query query, boolean deleteMultiple) {
+    public DeleteResult delete(String collectionName, Query query, boolean deleteMultiple, String requestId) {
         logger.info("Deleting documents from collection: {} (multiple: {})", collectionName, deleteMultiple);
 
-        DeleteResult result;
-        if (deleteMultiple) {
-            result = mongoTemplate.remove(query, collectionName);
-        } else {
-            result = mongoTemplate.remove(query.limit(1), collectionName);
+        Query safeQuery = applyNotDeletedFilter(query);
+
+        Update update = new Update()
+                .set("isDeleted", true)
+                .currentDate("lastModifiedAt");
+
+        if (requestId != null) {
+            update.set("latestRequestId", requestId);
         }
 
-        logger.info("Delete result: deleted={}", result.getDeletedCount());
-        return result;
+        UpdateResult result;
+        if (deleteMultiple) {
+            result = mongoTemplate.updateMulti(safeQuery, update, collectionName);
+        } else {
+            result = mongoTemplate.updateFirst(safeQuery, update, collectionName);
+        }
+
+        logger.info("Soft delete result: matched={}, modified={}", result.getMatchedCount(), result.getModifiedCount());
+        return DeleteResult.acknowledged(result.getModifiedCount());
+    }
+
+    /**
+     * Ensures queries automatically ignore logically deleted documents
+     */
+    private Query applyNotDeletedFilter(Query query) {
+        Query effectiveQuery = query != null ? query : new Query();
+        effectiveQuery.getQueryObject().remove("isDeleted");
+        effectiveQuery.addCriteria(Criteria.where("isDeleted").ne(true));
+        return effectiveQuery;
     }
 }
 

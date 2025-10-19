@@ -93,6 +93,9 @@ public class EndpointRegistry {
                 // Load allowed write methods
                 Set<String> allowedWriteMethods = loadAllowedWriteMethods(name, endpointsBasePath);
 
+                // Load sub-entity configuration
+                Set<String> subEntities = loadSubEntities(name, endpointsBasePath);
+
                 Endpoint endpoint = new Endpoint(
                     name,
                     path,
@@ -104,7 +107,8 @@ public class EndpointRegistry {
                     readFilterConfig,
                     writeFilterConfig,
                     schemaReference,
-                    allowedWriteMethods
+                    allowedWriteMethods,
+                    subEntities
                 );
 
                 String cacheKey = endpoint.getCacheKey();
@@ -254,5 +258,33 @@ public class EndpointRegistry {
 
         logger.info("Loaded write methods for endpoint {}: {}", endpointName, methods);
         return methods;
+    }
+
+    /**
+     * Loads configured sub-entity field names for an endpoint from Zookeeper
+     * Structure: /{ENV}/{SERVICE}/endpoints/{endpointName}/subEntities
+     * Value format: comma-separated list of field names
+     */
+    private Set<String> loadSubEntities(String endpointName, String endpointsBasePath) {
+        String subEntitiesPath = endpointsBasePath + "/" + endpointName + "/subEntities";
+        Map<String, byte[]> allConfig = configService.getAllConfiguration();
+
+        byte[] subEntitiesData = allConfig.get(subEntitiesPath);
+        if (subEntitiesData == null) {
+            return Set.of();
+        }
+
+        String rawValue = ZookeeperUtils.bytesToString(subEntitiesData).orElse("");
+        if (rawValue.isBlank()) {
+            return Set.of();
+        }
+
+        Set<String> subEntities = Arrays.stream(rawValue.split("[,\\n]"))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toCollection(java.util.LinkedHashSet::new));
+
+        logger.info("Loaded sub-entities for endpoint {}: {}", endpointName, subEntities);
+        return subEntities;
     }
 }
