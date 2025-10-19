@@ -2,9 +2,6 @@ package iaf.ofek.sigma.persistence.repository;
 
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.changestream.ChangeStreamDocument;
-import com.mongodb.client.result.DeleteResult;
-import com.mongodb.client.result.InsertManyResult;
-import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import iaf.ofek.sigma.model.DynamicDocument;
 import iaf.ofek.sigma.persistence.entity.SequenceCheckpoint;
@@ -51,7 +48,11 @@ public class DynamicMongoRepository {
      */
     public List<Document> findAll(String collectionName) {
         logger.debug("Querying all documents from collection: {}", collectionName);
-        return mongoTemplate.findAll(Document.class, collectionName);
+        Query query = new Query();
+        if (!query.getQueryObject().containsKey("isDeleted")) {
+            query.addCriteria(Criteria.where("isDeleted").ne(true));
+        }
+        return mongoTemplate.find(query, Document.class, collectionName);
     }
 
     /**
@@ -59,6 +60,9 @@ public class DynamicMongoRepository {
      * Used by FilteredQueryRequest
      */
     public List<Document> findWithQuery(String collectionName, Query query) {
+        if (!query.getQueryObject().containsKey("isDeleted")) {
+            query.addCriteria(Criteria.where("isDeleted").ne(true));
+        }
         logger.debug("Executing query on collection {}: {}", collectionName, query);
         return mongoTemplate.find(query, Document.class, collectionName);
     }
@@ -279,17 +283,25 @@ public class DynamicMongoRepository {
      * @param deleteMultiple Whether to delete all matching documents or just the first
      * @return DeleteResult containing the count of deleted documents
      */
-    public DeleteResult delete(String collectionName, Query query, boolean deleteMultiple) {
-        logger.info("Deleting documents from collection: {} (multiple: {})", collectionName, deleteMultiple);
+    public UpdateResult logicalDelete(String collectionName,
+                                      Query query,
+                                      boolean deleteMultiple,
+                                      String requestId) {
+        logger.info("Logically deleting documents from collection: {} (multiple: {})", collectionName, deleteMultiple);
 
-        DeleteResult result;
+        Update update = new Update()
+                .set("isDeleted", true)
+                .set("latestRequestId", requestId);
+
+        UpdateResult result;
         if (deleteMultiple) {
-            result = mongoTemplate.remove(query, collectionName);
+            result = mongoTemplate.updateMulti(query, update, collectionName);
         } else {
-            result = mongoTemplate.remove(query.limit(1), collectionName);
+            result = mongoTemplate.updateFirst(query, update, collectionName);
         }
 
-        logger.info("Delete result: deleted={}", result.getDeletedCount());
+        logger.info("Logical delete result: matched={}, modified={}",
+                result.getMatchedCount(), result.getModifiedCount());
         return result;
     }
 }

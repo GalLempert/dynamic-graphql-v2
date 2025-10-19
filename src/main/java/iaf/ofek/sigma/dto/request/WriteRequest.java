@@ -45,7 +45,8 @@ public interface WriteRequest {
      */
     iaf.ofek.sigma.dto.response.WriteResponse execute(
             iaf.ofek.sigma.service.write.WriteService service,
-            String collectionName
+            String collectionName,
+            iaf.ofek.sigma.model.Endpoint endpoint
     );
 
     /**

@@ -23,6 +23,7 @@ This guide explains how to configure ZooKeeper for the dynamic GraphQL/REST API 
     │   ├── sequenceEnabled    # "true"
     │   ├── defaultBulkSize    # "100"
     │   ├── writeMethods       # "POST,PUT,PATCH,DELETE"
+    │   ├── subEntities        # "children,addresses" (optional logical child lists)
     │   ├── schema             # "user-schema:required"
     │   ├── readFilter/        # Filter config for READ operations (queries)
     │   │   ├── name           # "$eq,$regex"
@@ -37,6 +38,7 @@ This guide explains how to configure ZooKeeper for the dynamic GraphQL/REST API 
         ├── httpMethod         # "GET"
         ├── databaseCollection # "products"
         ├── writeMethods       # "POST,PATCH,DELETE"
+        ├── subEntities        # "variations" (optional)
         ├── schema             # "product-schema:required"
         ├── readFilter/        # Permissive for complex queries
         │   ├── category       # "$eq,$in"

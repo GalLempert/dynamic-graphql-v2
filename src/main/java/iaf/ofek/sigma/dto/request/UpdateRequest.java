@@ -39,8 +39,9 @@ public class UpdateRequest implements WriteRequest {
     @Override
     public iaf.ofek.sigma.dto.response.WriteResponse execute(
             iaf.ofek.sigma.service.write.WriteService service,
-            String collectionName) {
-        return service.executeUpdate(this, collectionName);
+            String collectionName,
+            iaf.ofek.sigma.model.Endpoint endpoint) {
+        return service.executeUpdate(this, collectionName, endpoint);
     }
 
     @Override

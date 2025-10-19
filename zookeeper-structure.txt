@@ -30,6 +30,7 @@ create /dev/sigma/endpoints/People/databaseCollection "people"
 create /dev/sigma/endpoints/People/type "REST"
 create /dev/sigma/endpoints/People/sequenceEnabled "true"
 create /dev/sigma/endpoints/People/defaultBulkSize "100"
+create /dev/sigma/endpoints/People/subEntities "children"
 
 # Example Endpoint 2: Users (without sequence support)
 create /dev/sigma/endpoints/Users ""
@@ -39,6 +40,7 @@ create /dev/sigma/endpoints/Users/databaseCollection "users"
 create /dev/sigma/endpoints/Users/type "REST"
 create /dev/sigma/endpoints/Users/sequenceEnabled "false"
 create /dev/sigma/endpoints/Users/defaultBulkSize "50"
+create /dev/sigma/endpoints/Users/subEntities "addresses,devices"
 
 # Example Endpoint 3: Products (GraphQL with sequence)
 create /dev/sigma/endpoints/Products ""
@@ -48,6 +50,7 @@ create /dev/sigma/endpoints/Products/databaseCollection "products"
 create /dev/sigma/endpoints/Products/type "GRAPHQL"
 create /dev/sigma/endpoints/Products/sequenceEnabled "true"
 create /dev/sigma/endpoints/Products/defaultBulkSize "200"
+create /dev/sigma/endpoints/Products/subEntities "variants"
 
 # ========================================
 # DataSource Configuration (MongoDB)

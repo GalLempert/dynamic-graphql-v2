@@ -57,8 +57,9 @@ public class CreateRequest implements WriteRequest {
     @Override
     public iaf.ofek.sigma.dto.response.WriteResponse execute(
             iaf.ofek.sigma.service.write.WriteService service,
-            String collectionName) {
-        return service.executeCreate(this, collectionName);
+            String collectionName,
+            iaf.ofek.sigma.model.Endpoint endpoint) {
+        return service.executeCreate(this, collectionName, endpoint);
     }
 
     @Override
