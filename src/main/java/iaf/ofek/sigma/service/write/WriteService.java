@@ -1,40 +1,39 @@
 package iaf.ofek.sigma.service.write;
 
-import com.mongodb.client.result.DeleteResult;
 import com.mongodb.client.result.UpdateResult;
-import iaf.ofek.sigma.dto.request.*;
-import iaf.ofek.sigma.dto.response.*;
+import iaf.ofek.sigma.dto.request.CreateRequest;
+import iaf.ofek.sigma.dto.request.DeleteRequest;
+import iaf.ofek.sigma.dto.request.UpdateRequest;
+import iaf.ofek.sigma.dto.request.UpsertRequest;
+import iaf.ofek.sigma.dto.request.WriteRequest;
+import iaf.ofek.sigma.dto.response.CreateResponse;
+import iaf.ofek.sigma.dto.response.DeleteResponse;
+import iaf.ofek.sigma.dto.response.UpdateResponse;
+import iaf.ofek.sigma.dto.response.UpsertResponse;
+import iaf.ofek.sigma.dto.response.WriteResponse;
 import iaf.ofek.sigma.filter.FilterTranslator;
 import iaf.ofek.sigma.model.DynamicDocument;
+import iaf.ofek.sigma.model.Endpoint;
 import iaf.ofek.sigma.persistence.repository.DynamicMongoRepository;
 import org.bson.BsonValue;
+import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.data.mongodb.core.query.BasicQuery;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
  * Service for executing write operations with ACID transaction support
- *
- * Responsibilities:
- * - Execute CREATE, UPDATE, DELETE, UPSERT operations
- * - Inject audit fields automatically
- * - Translate filters to MongoDB queries
- * - Call repository layer
- * - Ensure ACID properties via @Transactional
- *
- * All write methods are transactional - if any operation fails, the entire
- * transaction will be rolled back to maintain data consistency.
- *
- * Note: MongoDB transactions require MongoDB 4.0+ with replica set configuration
  */
 @Service
-@Transactional  // All methods in this service run within a transaction by default
+@Transactional
 public class WriteService {
 
     private static final Logger logger = LoggerFactory.getLogger(WriteService.class);
@@ -48,106 +47,117 @@ public class WriteService {
     }
 
     /**
-     * Executes a write request
-     * Uses polymorphism - ZERO switch statements!
+     * Executes a write request using polymorphic dispatch
      */
-    public WriteResponse execute(WriteRequest request, String collectionName) {
-        logger.info("Executing {} operation on collection: {}", request.getType(), collectionName);
-        return request.execute(this, collectionName);
+    public WriteResponse execute(WriteRequest request, Endpoint endpoint) {
+        logger.info("Executing {} operation on collection: {}", request.getType(), endpoint.getDatabaseCollection());
+        return request.execute(this, endpoint);
     }
 
-    /**
-     * Executes CREATE operation
-     * Made public for Template Method pattern
-     * Audit fields are automatically populated by Spring Data
-     */
-    public WriteResponse executeCreate(CreateRequest request, String collectionName) {
-        // Convert Map to DynamicDocument and set request ID
+    public WriteResponse executeCreate(CreateRequest request, Endpoint endpoint) {
+        SubEntityProcessor processor = new SubEntityProcessor(endpoint.getSubEntities());
+
         List<DynamicDocument> documents = request.getDocuments().stream()
-                .map(doc -> {
-                    DynamicDocument dynamicDoc = new DynamicDocument(doc);
-                    dynamicDoc.setLatestRequestId(request.getRequestId());
-                    return dynamicDoc;
-                })
+                .map(doc -> prepareDocumentForInsert(doc, request.getRequestId(), processor))
                 .collect(Collectors.toList());
 
         if (request.isBulk()) {
-            List<String> insertedIds = repository.insertMany(collectionName, documents);
+            List<String> insertedIds = repository.insertMany(endpoint.getDatabaseCollection(), documents);
             return new CreateResponse(insertedIds);
-        } else {
-            String insertedId = repository.insertOne(collectionName, documents.get(0));
-            return new CreateResponse(List.of(insertedId));
         }
+
+        String insertedId = repository.insertOne(endpoint.getDatabaseCollection(), documents.get(0));
+        return new CreateResponse(List.of(insertedId));
     }
 
-    /**
-     * Executes UPDATE operation
-     * Made public for Template Method pattern
-     * lastModifiedAt and lastModifiedBy are automatically updated by Spring Data
-     */
-    public WriteResponse executeUpdate(UpdateRequest request, String collectionName) {
-        // Translate filter to MongoDB query
-        iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
-                new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
-        Query query = filterTranslator.translate(filterRequest);
+    public WriteResponse executeUpdate(UpdateRequest request, Endpoint endpoint) {
+        Query query = translateFilter(request.getFilter());
+        Query existenceQuery = cloneQuery(query);
 
-        // Add latestRequestId to updates
-        Map<String, Object> updates = new java.util.HashMap<>(request.getUpdates());
+        Map<String, Object> updates = new HashMap<>(request.getUpdates());
+        updates.remove("isDeleted");
         updates.put("latestRequestId", request.getRequestId());
 
-        // Execute update - Spring Data will auto-update lastModifiedAt/lastModifiedBy
+        SubEntityProcessor processor = new SubEntityProcessor(endpoint.getSubEntities());
+        if (processor.hasSubEntityPayload(updates)) {
+            if (request.isUpdateMultiple()) {
+                throw new IllegalArgumentException("Sub-entity operations only support single document updates");
+            }
+
+            Document existing = repository.findOneActive(endpoint.getDatabaseCollection(), cloneQuery(query));
+            if (existing == null) {
+                failForMissingOrDeleted(endpoint, existenceQuery, "Update");
+            }
+            processor.mergeForUpdate(updates, existing);
+        }
+
         UpdateResult result = repository.update(
-                collectionName,
+                endpoint.getDatabaseCollection(),
                 query,
                 updates,
                 request.isUpdateMultiple()
         );
 
+        if (result.getMatchedCount() == 0) {
+            failForMissingOrDeleted(endpoint, existenceQuery, "Update");
+        }
+
         return new UpdateResponse(result.getMatchedCount(), result.getModifiedCount());
     }
 
-    /**
-     * Executes DELETE operation
-     * Made public for Template Method pattern
-     */
-    public WriteResponse executeDelete(DeleteRequest request, String collectionName) {
-        // Translate filter to MongoDB query
-        iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
-                new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
-        Query query = filterTranslator.translate(filterRequest);
+    public WriteResponse executeDelete(DeleteRequest request, Endpoint endpoint) {
+        Query query = translateFilter(request.getFilter());
+        Query existenceQuery = cloneQuery(query);
 
-        // Execute delete
-        DeleteResult result = repository.delete(
-                collectionName,
+        UpdateResult result = repository.softDelete(
+                endpoint.getDatabaseCollection(),
                 query,
-                request.isDeleteMultiple()
+                request.isDeleteMultiple(),
+                request.getRequestId()
         );
 
-        return new DeleteResponse(result.getDeletedCount());
+        if (result.getMatchedCount() == 0) {
+            failForMissingOrDeleted(endpoint, existenceQuery, "Delete");
+        }
+
+        return new DeleteResponse(result.getModifiedCount());
     }
 
-    /**
-     * Executes UPSERT operation
-     * Made public for Template Method pattern
-     * Audit fields automatically managed by Spring Data (createdAt if insert, lastModifiedAt if update)
-     */
-    public WriteResponse executeUpsert(UpsertRequest request, String collectionName) {
-        // Translate filter to MongoDB query
-        iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
-                new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
-        Query query = filterTranslator.translate(filterRequest);
+    public WriteResponse executeUpsert(UpsertRequest request, Endpoint endpoint) {
+        Query query = translateFilter(request.getFilter());
+        Query existenceQuery = cloneQuery(query);
 
-        // Add latestRequestId to document
-        Map<String, Object> document = new java.util.HashMap<>(request.getDocument());
+        Map<String, Object> document = new HashMap<>(request.getDocument());
+        document.remove("isDeleted");
         document.put("latestRequestId", request.getRequestId());
 
-        // Execute upsert - Spring Data handles audit fields
-        UpdateResult result = repository.upsert(collectionName, query, document);
+        SubEntityProcessor processor = new SubEntityProcessor(endpoint.getSubEntities());
+        Document existing = repository.findOneActive(endpoint.getDatabaseCollection(), cloneQuery(query));
 
-        boolean wasInserted = result.getUpsertedId() != null;
-        String documentId = wasInserted
-                ? result.getUpsertedId().asObjectId().getValue().toString()
-                : null;
+        if (existing != null) {
+            if (processor.hasSubEntityPayload(document)) {
+                processor.mergeForUpdate(document, existing);
+            }
+
+            UpdateResult result = repository.update(endpoint.getDatabaseCollection(), query, document, false);
+            if (result.getMatchedCount() == 0) {
+                failForMissingOrDeleted(endpoint, existenceQuery, "Upsert");
+            }
+            return new UpsertResponse(false, null, result.getMatchedCount(), result.getModifiedCount());
+        }
+
+        if (repository.existsIncludingDeleted(endpoint.getDatabaseCollection(), existenceQuery)) {
+            throw new IllegalArgumentException("Upsert failed: target document is deleted");
+        }
+
+        processor.prepareForInsert(document);
+        document.put("isDeleted", false);
+
+        UpdateResult result = repository.upsert(endpoint.getDatabaseCollection(), query, document);
+
+        BsonValue upsertedId = result.getUpsertedId();
+        boolean wasInserted = upsertedId != null;
+        String documentId = wasInserted ? upsertedId.asObjectId().getValue().toString() : null;
 
         return new UpsertResponse(
                 wasInserted,
@@ -156,4 +166,35 @@ public class WriteService {
                 result.getModifiedCount()
         );
     }
+
+    private DynamicDocument prepareDocumentForInsert(Map<String, Object> source,
+                                                     String requestId,
+                                                     SubEntityProcessor processor) {
+        Map<String, Object> document = source != null ? new HashMap<>(source) : new HashMap<>();
+        processor.prepareForInsert(document);
+
+        DynamicDocument dynamicDocument = new DynamicDocument(document);
+        dynamicDocument.setLatestRequestId(requestId);
+        dynamicDocument.setDeleted(false);
+        return dynamicDocument;
+    }
+
+    private Query translateFilter(Map<String, Object> filter) {
+        iaf.ofek.sigma.model.filter.FilterRequest filterRequest =
+                new iaf.ofek.sigma.model.filter.FilterRequest(filter, null);
+        return filterTranslator.translate(filterRequest);
+    }
+
+    private Query cloneQuery(Query query) {
+        return query == null ? new Query() : new BasicQuery(query.getQueryObject());
+    }
+
+    private void failForMissingOrDeleted(Endpoint endpoint, Query existenceQuery, String operation) {
+        boolean exists = repository.existsIncludingDeleted(endpoint.getDatabaseCollection(), existenceQuery);
+        if (exists) {
+            throw new IllegalArgumentException(operation + " failed: target document is deleted");
+        }
+        throw new IllegalArgumentException(operation + " failed: no document matches the provided filter");
+    }
 }
+

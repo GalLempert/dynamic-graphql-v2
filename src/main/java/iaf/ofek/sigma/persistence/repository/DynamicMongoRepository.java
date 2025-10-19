@@ -2,9 +2,6 @@ package iaf.ofek.sigma.persistence.repository;
 
 import com.mongodb.client.MongoCursor;
 import com.mongodb.client.model.changestream.ChangeStreamDocument;
-import com.mongodb.client.result.DeleteResult;
-import com.mongodb.client.result.InsertManyResult;
-import com.mongodb.client.result.InsertOneResult;
 import com.mongodb.client.result.UpdateResult;
 import iaf.ofek.sigma.model.DynamicDocument;
 import iaf.ofek.sigma.persistence.entity.SequenceCheckpoint;
@@ -51,7 +48,9 @@ public class DynamicMongoRepository {
      */
     public List<Document> findAll(String collectionName) {
         logger.debug("Querying all documents from collection: {}", collectionName);
-        return mongoTemplate.findAll(Document.class, collectionName);
+        Query query = new Query();
+        applyNotDeletedFilter(query);
+        return mongoTemplate.find(query, Document.class, collectionName);
     }
 
     /**
@@ -60,7 +59,9 @@ public class DynamicMongoRepository {
      */
     public List<Document> findWithQuery(String collectionName, Query query) {
         logger.debug("Executing query on collection {}: {}", collectionName, query);
-        return mongoTemplate.find(query, Document.class, collectionName);
+        Query activeQuery = query != null ? query : new Query();
+        applyNotDeletedFilter(activeQuery);
+        return mongoTemplate.find(activeQuery, Document.class, collectionName);
     }
 
     /**
@@ -229,16 +230,15 @@ public class DynamicMongoRepository {
     public UpdateResult update(String collectionName, Query query, Map<String, Object> updates, boolean updateMultiple) {
         logger.info("Updating documents in collection: {} (multiple: {})", collectionName, updateMultiple);
 
-        // Build Update object
+        Query activeQuery = query != null ? query : new Query();
+        applyNotDeletedFilter(activeQuery);
+
         Update update = new Update();
         updates.forEach(update::set);
 
-        UpdateResult result;
-        if (updateMultiple) {
-            result = mongoTemplate.updateMulti(query, update, collectionName);
-        } else {
-            result = mongoTemplate.updateFirst(query, update, collectionName);
-        }
+        UpdateResult result = updateMultiple
+                ? mongoTemplate.updateMulti(activeQuery, update, collectionName)
+                : mongoTemplate.updateFirst(activeQuery, update, collectionName);
 
         logger.info("Update result: matched={}, modified={}", result.getMatchedCount(), result.getModifiedCount());
         return result;
@@ -255,11 +255,13 @@ public class DynamicMongoRepository {
     public UpdateResult upsert(String collectionName, Query query, Map<String, Object> document) {
         logger.info("Upserting document in collection: {}", collectionName);
 
-        // Build Update object
+        Query activeQuery = query != null ? query : new Query();
+        applyNotDeletedFilter(activeQuery);
+
         Update update = new Update();
         document.forEach(update::set);
 
-        UpdateResult result = mongoTemplate.upsert(query, update, collectionName);
+        UpdateResult result = mongoTemplate.upsert(activeQuery, update, collectionName);
 
         if (result.getUpsertedId() != null) {
             logger.info("Upserted new document with id: {}", result.getUpsertedId());
@@ -279,18 +281,49 @@ public class DynamicMongoRepository {
      * @param deleteMultiple Whether to delete all matching documents or just the first
      * @return DeleteResult containing the count of deleted documents
      */
-    public DeleteResult delete(String collectionName, Query query, boolean deleteMultiple) {
-        logger.info("Deleting documents from collection: {} (multiple: {})", collectionName, deleteMultiple);
+    public UpdateResult softDelete(String collectionName, Query query, boolean deleteMultiple, String requestId) {
+        logger.info("Soft deleting documents from collection: {} (multiple: {})", collectionName, deleteMultiple);
 
-        DeleteResult result;
-        if (deleteMultiple) {
-            result = mongoTemplate.remove(query, collectionName);
-        } else {
-            result = mongoTemplate.remove(query.limit(1), collectionName);
+        Query activeQuery = query != null ? query : new Query();
+        applyNotDeletedFilter(activeQuery);
+
+        Update update = new Update().set("isDeleted", true);
+        if (requestId != null) {
+            update.set("latestRequestId", requestId);
         }
 
-        logger.info("Delete result: deleted={}", result.getDeletedCount());
+        UpdateResult result = deleteMultiple
+                ? mongoTemplate.updateMulti(activeQuery, update, collectionName)
+                : mongoTemplate.updateFirst(activeQuery, update, collectionName);
+
+        logger.info("Soft delete result: matched={}, modified={}", result.getMatchedCount(), result.getModifiedCount());
         return result;
+    }
+
+    public Document findOneActive(String collectionName, Query query) {
+        Query activeQuery = query != null ? query : new Query();
+        applyNotDeletedFilter(activeQuery);
+        return mongoTemplate.findOne(activeQuery, Document.class, collectionName);
+    }
+
+    public Document findOneIncludingDeleted(String collectionName, Query query) {
+        Query lookupQuery = query != null ? query : new Query();
+        return mongoTemplate.findOne(lookupQuery, Document.class, collectionName);
+    }
+
+    public boolean existsIncludingDeleted(String collectionName, Query query) {
+        Query lookupQuery = query != null ? query : new Query();
+        return mongoTemplate.exists(lookupQuery, Document.class, collectionName);
+    }
+
+    private void applyNotDeletedFilter(Query query) {
+        if (query == null) {
+            return;
+        }
+
+        if (!query.getQueryObject().containsKey("isDeleted")) {
+            query.addCriteria(Criteria.where("isDeleted").ne(true));
+        }
     }
 }
 

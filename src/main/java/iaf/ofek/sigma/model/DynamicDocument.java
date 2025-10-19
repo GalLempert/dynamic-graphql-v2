@@ -97,6 +97,7 @@ public class DynamicDocument extends AuditableBaseDocument {
         if (getLastModifiedAt() != null) result.put("lastModifiedAt", getLastModifiedAt());
         if (getCreatedBy() != null) result.put("createdBy", getCreatedBy());
         if (getLastModifiedBy() != null) result.put("lastModifiedBy", getLastModifiedBy());
+        result.put("isDeleted", isDeleted());
 
         return result;
     }
@@ -128,8 +129,18 @@ public class DynamicDocument extends AuditableBaseDocument {
         dynamicFields.remove("lastModifiedAt");
         dynamicFields.remove("createdBy");
         dynamicFields.remove("lastModifiedBy");
+        dynamicFields.remove("isDeleted");
 
         doc.setDynamicFields(dynamicFields);
+
+        if (map.containsKey("isDeleted")) {
+            Object deleted = map.get("isDeleted");
+            if (deleted instanceof Boolean) {
+                doc.setDeleted((Boolean) deleted);
+            } else if (deleted != null) {
+                doc.setDeleted(Boolean.parseBoolean(deleted.toString()));
+            }
+        }
 
         return doc;
     }

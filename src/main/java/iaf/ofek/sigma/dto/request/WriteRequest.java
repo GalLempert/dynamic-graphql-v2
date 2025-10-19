@@ -1,5 +1,7 @@
 package iaf.ofek.sigma.dto.request;
 
+import iaf.ofek.sigma.model.Endpoint;
+
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +47,7 @@ public interface WriteRequest {
      */
     iaf.ofek.sigma.dto.response.WriteResponse execute(
             iaf.ofek.sigma.service.write.WriteService service,
-            String collectionName
+            Endpoint endpoint
     );
 
     /**

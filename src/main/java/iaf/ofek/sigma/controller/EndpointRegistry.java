@@ -92,6 +92,7 @@ public class EndpointRegistry {
 
                 // Load allowed write methods
                 Set<String> allowedWriteMethods = loadAllowedWriteMethods(name, endpointsBasePath);
+                Set<String> subEntities = loadSubEntities(name, endpointsBasePath);
 
                 Endpoint endpoint = new Endpoint(
                     name,
@@ -104,7 +105,8 @@ public class EndpointRegistry {
                     readFilterConfig,
                     writeFilterConfig,
                     schemaReference,
-                    allowedWriteMethods
+                    allowedWriteMethods,
+                    subEntities
                 );
 
                 String cacheKey = endpoint.getCacheKey();
@@ -254,5 +256,37 @@ public class EndpointRegistry {
 
         logger.info("Loaded write methods for endpoint {}: {}", endpointName, methods);
         return methods;
+    }
+
+    private Set<String> loadSubEntities(String endpointName, String endpointsBasePath) {
+        String subEntitiesPath = endpointsBasePath + "/" + endpointName + "/subEntities";
+        Map<String, byte[]> allConfig = configService.getAllConfiguration();
+
+        byte[] data = allConfig.get(subEntitiesPath);
+        if (data == null) {
+            return Set.of();
+        }
+
+        String value = ZookeeperUtils.bytesToString(data).orElse("").trim();
+        if (value.isEmpty()) {
+            return Set.of();
+        }
+
+        String sanitized = value;
+        if (sanitized.startsWith("[") && sanitized.endsWith("]")) {
+            sanitized = sanitized.substring(1, sanitized.length() - 1);
+        }
+
+        Set<String> subEntities = Arrays.stream(sanitized.split("[\\n,]"))
+                .map(String::trim)
+                .map(name -> name.replace("\"", ""))
+                .filter(s -> !s.isEmpty())
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        if (!subEntities.isEmpty()) {
+            logger.info("Loaded sub-entities for endpoint {}: {}", endpointName, subEntities);
+        }
+
+        return subEntities;
     }
 }
