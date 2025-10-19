@@ -22,11 +22,13 @@ public class Endpoint {
     private final FilterConfig writeFilterConfig;
     private final SchemaReference schemaReference;
     private final Set<String> allowedWriteMethods;
+    private final Set<String> subEntities;
 
     public Endpoint(String name, String path, String httpMethod, String databaseCollection,
                    EndpointType type, boolean sequenceEnabled, int defaultBulkSize,
                    FilterConfig readFilterConfig, FilterConfig writeFilterConfig,
-                   SchemaReference schemaReference, Set<String> allowedWriteMethods) {
+                   SchemaReference schemaReference, Set<String> allowedWriteMethods,
+                   Set<String> subEntities) {
         this.name = name;
         this.path = path;
         this.httpMethod = httpMethod;
@@ -37,7 +39,8 @@ public class Endpoint {
         this.readFilterConfig = readFilterConfig;
         this.writeFilterConfig = writeFilterConfig;
         this.schemaReference = schemaReference;
-        this.allowedWriteMethods = allowedWriteMethods != null ? allowedWriteMethods : Set.of();
+        this.allowedWriteMethods = allowedWriteMethods != null ? Set.copyOf(allowedWriteMethods) : Set.of();
+        this.subEntities = subEntities != null ? Set.copyOf(subEntities) : Set.of();
     }
 
     public String getName() {
@@ -93,6 +96,10 @@ public class Endpoint {
         return allowedWriteMethods;
     }
 
+    public Set<String> getSubEntities() {
+        return subEntities;
+    }
+
     /**
      * Checks if a specific HTTP method is allowed for write operations
      */
@@ -128,6 +135,7 @@ public class Endpoint {
                 ", writeFilterConfig=" + writeFilterConfig +
                 ", schemaReference=" + schemaReference +
                 ", allowedWriteMethods=" + allowedWriteMethods +
+                ", subEntities=" + subEntities +
                 '}';
     }
 

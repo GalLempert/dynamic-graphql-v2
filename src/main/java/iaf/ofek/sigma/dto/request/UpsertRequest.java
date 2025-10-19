@@ -48,8 +48,8 @@ public class UpsertRequest implements WriteRequest {
     @Override
     public iaf.ofek.sigma.dto.response.WriteResponse execute(
             iaf.ofek.sigma.service.write.WriteService service,
-            String collectionName) {
-        return service.executeUpsert(this, collectionName);
+            iaf.ofek.sigma.model.Endpoint endpoint) {
+        return service.executeUpsert(this, endpoint);
     }
 
     @Override
