@@ -23,6 +23,7 @@ public class ZookeeperConfigService {
     private final String service;
     private final String serviceRootPath;
     private final String dataSourceRootPath;
+    private final String globalsRootPath;
 
     public ZookeeperConfigService(ZookeeperTreeReader treeReader, ZookeeperWatcher watcher) {
         this.treeReader = treeReader;
@@ -42,6 +43,7 @@ public class ZookeeperConfigService {
         // Build paths
         this.serviceRootPath = "/" + env + "/" + service;
         this.dataSourceRootPath = "/" + env + "/dataSource";
+        this.globalsRootPath = "/" + env + "/Globals";
 
         logger.info("Zookeeper paths initialized - Service: {}, DataSource: {}", serviceRootPath, dataSourceRootPath);
     }
@@ -60,6 +62,9 @@ public class ZookeeperConfigService {
 
             // Load dataSource configuration
             loadTreeIfExists(dataSourceRootPath, "DataSource");
+
+            // Load globals configuration
+            loadTreeIfExists(globalsRootPath, "Globals");
 
             logger.info("Total configuration nodes loaded: {}", configuration.size());
 

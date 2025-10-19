@@ -18,6 +18,7 @@ public class ZookeeperConfigProperties {
     private final ZookeeperConfigService configService;
     private final String serviceBasePath;
     private final String dataSourceBasePath;
+    private final String globalsBasePath;
 
     public ZookeeperConfigProperties(ZookeeperConfigService configService) {
         this.configService = configService;
@@ -33,6 +34,7 @@ public class ZookeeperConfigProperties {
 
         this.serviceBasePath = "/" + env + "/" + service;
         this.dataSourceBasePath = "/" + env + "/dataSource";
+        this.globalsBasePath = "/" + env + "/Globals";
     }
 
     // ========== Service Configuration ==========
@@ -76,6 +78,15 @@ public class ZookeeperConfigProperties {
 
     public String getMongoAuthDatabase() {
         return getDataSourceProperty("mongodb.authDatabase", "admin");
+    }
+
+    // ========== Globals Configuration ==========
+
+    /**
+     * Determines if environment validation is enabled
+     */
+    public boolean isEnvValidationEnabled() {
+        return getGlobalPropertyAsBoolean("IsEnvValidate", Boolean.FALSE);
     }
 
     // ========== Helper Methods ==========
@@ -130,6 +141,15 @@ public class ZookeeperConfigProperties {
      */
     public Boolean getServicePropertyAsBoolean(String key, Boolean defaultValue) {
         String fullPath = serviceBasePath + "/" + key;
+        byte[] data = configService.getNodeData(fullPath);
+        return ZookeeperUtils.bytesToBoolean(data, defaultValue);
+    }
+
+    /**
+     * Gets a global property as Boolean with default value
+     */
+    public Boolean getGlobalPropertyAsBoolean(String key, Boolean defaultValue) {
+        String fullPath = globalsBasePath + "/" + key;
         byte[] data = configService.getNodeData(fullPath);
         return ZookeeperUtils.bytesToBoolean(data, defaultValue);
     }
