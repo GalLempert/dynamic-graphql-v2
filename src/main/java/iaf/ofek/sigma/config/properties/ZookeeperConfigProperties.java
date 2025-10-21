@@ -80,6 +80,10 @@ public class ZookeeperConfigProperties {
         return getDataSourceProperty("mongodb.authDatabase", "admin");
     }
 
+    public String getEnumServiceUrl() {
+        return getDataSourceProperty("enumURL");
+    }
+
     // ========== Globals Configuration ==========
 
     /**
@@ -87,6 +91,15 @@ public class ZookeeperConfigProperties {
      */
     public boolean isEnvValidationEnabled() {
         return getGlobalPropertyAsBoolean("IsEnvValidate", Boolean.FALSE);
+    }
+
+    public boolean shouldFailOnEnumLoadFailure() {
+        return getGlobalPropertyAsBoolean("FailOnEnumLoadFailure", Boolean.TRUE);
+    }
+
+    public long getEnumRefreshIntervalMillis() {
+        Long seconds = getGlobalPropertyAsLong("EnumRefreshIntervalSeconds", 300L);
+        return seconds * 1000;
     }
 
     // ========== Helper Methods ==========
@@ -152,5 +165,17 @@ public class ZookeeperConfigProperties {
         String fullPath = globalsBasePath + "/" + key;
         byte[] data = configService.getNodeData(fullPath);
         return ZookeeperUtils.bytesToBoolean(data, defaultValue);
+    }
+
+    public Integer getGlobalPropertyAsInt(String key, Integer defaultValue) {
+        String fullPath = globalsBasePath + "/" + key;
+        byte[] data = configService.getNodeData(fullPath);
+        return ZookeeperUtils.bytesToInteger(data, defaultValue);
+    }
+
+    public Long getGlobalPropertyAsLong(String key, Long defaultValue) {
+        String fullPath = globalsBasePath + "/" + key;
+        byte[] data = configService.getNodeData(fullPath);
+        return ZookeeperUtils.bytesToLong(data, defaultValue);
     }
 }

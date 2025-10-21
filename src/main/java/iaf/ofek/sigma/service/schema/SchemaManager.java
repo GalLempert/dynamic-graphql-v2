@@ -2,7 +2,10 @@ package iaf.ofek.sigma.service.schema;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.node.ObjectNode;
 import iaf.ofek.sigma.model.schema.JsonSchema;
+import iaf.ofek.sigma.service.enums.EnumRegistry;
+import iaf.ofek.sigma.service.enums.EnumRegistryListener;
 import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
@@ -30,7 +33,7 @@ import java.util.concurrent.ConcurrentHashMap;
  *   └── order-schema
  */
 @Service
-public class SchemaManager {
+public class SchemaManager implements EnumRegistryListener {
 
     private static final Logger logger = LoggerFactory.getLogger(SchemaManager.class);
 
@@ -38,15 +41,20 @@ public class SchemaManager {
     private final String schemasBasePath;
     private final ObjectMapper objectMapper;
     private final Map<String, JsonSchema> schemaCache;
+    private final EnumSchemaAugmentor enumSchemaAugmentor;
 
     public SchemaManager(
             ZooKeeper zooKeeper,
             @Value("${zookeeper.base-path}") String basePath,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            EnumRegistry enumRegistry) {
         this.zooKeeper = zooKeeper;
         this.schemasBasePath = basePath + "/schemas";
         this.objectMapper = objectMapper;
         this.schemaCache = new ConcurrentHashMap<>();
+        this.enumSchemaAugmentor = new EnumSchemaAugmentor(enumRegistry);
+
+        enumRegistry.registerListener(this);
 
         logger.info("SchemaManager initialized with base path: {}", schemasBasePath);
     }
@@ -83,9 +91,15 @@ public class SchemaManager {
 
             // Parse as JSON
             JsonNode schemaNode = objectMapper.readTree(schemaJson);
+            if (!(schemaNode instanceof ObjectNode objectNode)) {
+                logger.error("Schema '{}' is not a JSON object", schemaName);
+                return null;
+            }
+
+            EnumSchemaAugmentor.Result result = enumSchemaAugmentor.augment(objectNode);
 
             // Create and cache schema
-            JsonSchema schema = new JsonSchema(schemaName, schemaNode);
+            JsonSchema schema = new JsonSchema(schemaName, result.schema(), result.bindings());
             schemaCache.put(schemaName, schema);
 
             logger.info("Successfully loaded schema '{}' from ZooKeeper", schemaName);
@@ -97,6 +111,9 @@ public class SchemaManager {
 
         } catch (KeeperException | InterruptedException | IOException e) {
             logger.error("Error loading schema '{}' from ZooKeeper", schemaName, e);
+            return null;
+        } catch (RuntimeException e) {
+            logger.error("Error processing schema '{}'", schemaName, e);
             return null;
         }
     }
@@ -122,5 +139,10 @@ public class SchemaManager {
      */
     public int getCacheSize() {
         return schemaCache.size();
+    }
+
+    @Override
+    public void onEnumsReloaded() {
+        clearCache();
     }
 }
