@@ -2,7 +2,9 @@ package iaf.ofek.sigma.service.query;
 
 import iaf.ofek.sigma.dto.request.QueryRequest;
 import iaf.ofek.sigma.dto.response.QueryResponse;
+import iaf.ofek.sigma.model.Endpoint;
 import iaf.ofek.sigma.persistence.repository.DynamicMongoRepository;
+import iaf.ofek.sigma.service.query.strategy.QueryExecutionStrategyFactory;
 import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,10 +23,14 @@ public class QueryService {
 
     private final DynamicMongoRepository mongoRepository;
     private final QueryBuilder queryBuilder;
+    private final QueryExecutionStrategyFactory strategyFactory;
 
-    public QueryService(DynamicMongoRepository mongoRepository, QueryBuilder queryBuilder) {
+    public QueryService(DynamicMongoRepository mongoRepository,
+                        QueryBuilder queryBuilder,
+                        QueryExecutionStrategyFactory strategyFactory) {
         this.mongoRepository = mongoRepository;
         this.queryBuilder = queryBuilder;
+        this.strategyFactory = strategyFactory;
     }
 
     /**
@@ -52,8 +58,8 @@ public class QueryService {
      * @return Query response
      */
     @Observed(name = "query.execution", contextualName = "query.execute")
-    public QueryResponse execute(QueryRequest request, String collectionName) {
-        logger.info("Executing {} query on collection: {}", request.getType(), collectionName);
-        return request.execute(this, collectionName);
+    public QueryResponse execute(QueryRequest request, Endpoint endpoint) {
+        logger.info("Executing {} query on endpoint: {}", request.getType(), endpoint != null ? endpoint.getName() : "<unknown>");
+        return strategyFactory.getStrategy(endpoint).execute(request, endpoint, this);
     }
 }

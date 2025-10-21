@@ -96,6 +96,9 @@ public class EndpointRegistry {
                 // Load sub-entity configuration
                 Set<String> subEntities = loadSubEntities(name, endpointsBasePath);
 
+                // Load nested document configuration
+                String fatherDocument = properties.get("fatherDocument");
+
                 Endpoint endpoint = new Endpoint(
                     name,
                     path,
@@ -108,7 +111,8 @@ public class EndpointRegistry {
                     writeFilterConfig,
                     schemaReference,
                     allowedWriteMethods,
-                    subEntities
+                    subEntities,
+                    fatherDocument
                 );
 
                 String cacheKey = endpoint.getCacheKey();

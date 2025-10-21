@@ -84,7 +84,7 @@ public class Orchestrator {
             }
 
             // 2. Execute query
-            QueryResponse response = queryService.execute(request, endpoint.getDatabaseCollection());
+            QueryResponse response = queryService.execute(request, endpoint);
             response = enumResponseTransformer.transform(response, endpoint);
 
             logger.info("Query executed successfully: {} documents/results", getResponseSize(response));
