@@ -72,6 +72,7 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         body.put("affectedCount", response.getAffectedCount());
         body.put("insertedIds", response.getInsertedIds());
         body.put("insertedCount", response.getInsertedCount());
+        body.put("documents", timeFormatter.formatDocuments(response.getDocuments()));
 
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
@@ -86,6 +87,7 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         body.put("modifiedCount", response.getModifiedCount());
         body.put("noOp", response.isNoOp());
         response.getMessage().ifPresent(message -> body.put("message", message));
+        body.put("documents", timeFormatter.formatDocuments(response.getDocuments()));
 
         return ResponseEntity.ok(body);
     }
@@ -97,6 +99,7 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         body.put("success", response.isSuccess());
         body.put("affectedCount", response.getAffectedCount());
         body.put("deletedCount", response.getDeletedCount());
+        body.put("documents", timeFormatter.formatDocuments(response.getDocuments()));
 
         return ResponseEntity.ok(body);
     }
@@ -115,6 +118,7 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
             body.put("matchedCount", response.getMatchedCount());
             body.put("modifiedCount", response.getModifiedCount());
         }
+        body.put("documents", timeFormatter.formatDocuments(response.getDocuments()));
 
         HttpStatus status = response.isWasInserted() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(body);

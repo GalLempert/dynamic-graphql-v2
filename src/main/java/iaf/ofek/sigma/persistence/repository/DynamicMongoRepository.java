@@ -19,11 +19,14 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Repository;
+import org.bson.types.ObjectId;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 /**
@@ -53,6 +56,28 @@ public class DynamicMongoRepository {
         logger.debug("Querying all documents from collection: {}", collectionName);
         Query query = applyNotDeletedFilter(new Query());
         return mongoTemplate.find(query, Document.class, collectionName);
+    }
+
+    /**
+     * Loads documents by their identifiers while preserving the requested order.
+     *
+     * @param collectionName The collection name
+     * @param ids            List of identifiers to fetch
+     * @return Ordered list of documents corresponding to the supplied identifiers
+     */
+    public List<Document> findByIds(String collectionName, List<String> ids) {
+        return findByIds(collectionName, ids, false);
+    }
+
+    /**
+     * Loads documents by their identifiers, including logically deleted ones.
+     *
+     * @param collectionName The collection name
+     * @param ids            List of identifiers to fetch
+     * @return Ordered list of documents corresponding to the supplied identifiers
+     */
+    public List<Document> findByIdsIncludingDeleted(String collectionName, List<String> ids) {
+        return findByIds(collectionName, ids, true);
     }
 
     /**
@@ -377,6 +402,56 @@ public class DynamicMongoRepository {
         effectiveQuery.getQueryObject().remove("isDeleted");
         effectiveQuery.addCriteria(Criteria.where("isDeleted").ne(true));
         return effectiveQuery;
+    }
+
+    private List<Document> findByIds(String collectionName, List<String> ids, boolean includeDeleted) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+
+        List<Object> normalizedIds = ids.stream()
+                .filter(Objects::nonNull)
+                .map(this::normalizeId)
+                .toList();
+
+        Query query = new Query(Criteria.where("_id").in(normalizedIds));
+        Query effectiveQuery = includeDeleted ? query : applyNotDeletedFilter(query);
+
+        List<Document> documents = mongoTemplate.find(effectiveQuery, Document.class, collectionName);
+
+        Map<Object, Document> documentsById = new LinkedHashMap<>();
+        for (Document document : documents) {
+            Object identifier = document.get("_id");
+            if (identifier == null) {
+                continue;
+            }
+            documentsById.putIfAbsent(identifier, document);
+            if (identifier instanceof ObjectId objectId) {
+                documentsById.putIfAbsent(objectId.toHexString(), document);
+            } else {
+                documentsById.putIfAbsent(identifier.toString(), document);
+            }
+        }
+
+        List<Document> ordered = new ArrayList<>();
+        for (Object originalId : normalizedIds) {
+            Document document = documentsById.get(originalId);
+            if (document == null && originalId instanceof ObjectId objectId) {
+                document = documentsById.get(objectId.toHexString());
+            }
+            if (document != null) {
+                ordered.add(document);
+            }
+        }
+
+        return ordered;
+    }
+
+    private Object normalizeId(String id) {
+        if (ObjectId.isValid(id)) {
+            return new ObjectId(id);
+        }
+        return id;
     }
 }
 

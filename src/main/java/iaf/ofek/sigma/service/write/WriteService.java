@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -88,11 +89,13 @@ public class WriteService {
 
         if (request.isBulk()) {
             List<String> insertedIds = repository.insertMany(collectionName, documents);
-            return new CreateResponse(insertedIds);
+            List<Document> insertedDocuments = repository.findByIds(collectionName, insertedIds);
+            return new CreateResponse(insertedIds, insertedDocuments);
         }
 
         String insertedId = repository.insertOne(collectionName, documents.get(0));
-        return new CreateResponse(List.of(insertedId));
+        List<Document> insertedDocuments = repository.findByIds(collectionName, List.of(insertedId));
+        return new CreateResponse(List.of(insertedId), insertedDocuments);
     }
 
     /**
@@ -113,14 +116,16 @@ public class WriteService {
         UpdateChangeDetector.EvaluationResult evaluation = updateChangeDetector.evaluate(
                 collectionName, query, updates, request.isUpdateMultiple());
         if (evaluation.isNoOp()) {
+            List<Document> currentDocuments = evaluation.getMatchedDocuments();
             return new UpdateResponse(evaluation.getMatchedCount(), 0,
-                    true, evaluation.getMessage().orElse(null));
+                    true, evaluation.getMessage().orElse(null), currentDocuments);
         }
 
         updates.put("latestRequestId", request.getRequestId());
 
         UpdateResult result = repository.update(collectionName, query, updates, request.isUpdateMultiple());
-        return new UpdateResponse(result.getMatchedCount(), result.getModifiedCount());
+        List<Document> refreshedDocuments = repository.findWithQuery(collectionName, query);
+        return new UpdateResponse(result.getMatchedCount(), result.getModifiedCount(), false, null, refreshedDocuments);
     }
 
     /**
@@ -132,8 +137,19 @@ public class WriteService {
                 new iaf.ofek.sigma.model.filter.FilterRequest(request.getFilter(), null);
         Query query = filterTranslator.translate(filterRequest);
 
+        List<Document> targetedDocuments = repository.findWithQuery(collectionName, query);
+        List<String> targetedIds = targetedDocuments.stream()
+                .map(this::extractDocumentId)
+                .filter(Objects::nonNull)
+                .toList();
+
         DeleteResult result = repository.delete(collectionName, query, request.isDeleteMultiple(), request.getRequestId());
-        return new DeleteResponse(result.getDeletedCount());
+
+        List<Document> deletedDocuments = targetedIds.isEmpty()
+                ? List.of()
+                : repository.findByIdsIncludingDeleted(collectionName, targetedIds);
+
+        return new DeleteResponse(result.getDeletedCount(), deletedDocuments);
     }
 
     /**
@@ -160,7 +176,11 @@ public class WriteService {
 
                 UpdateResult updateResult = repository.update(collectionName, query, updates, false);
                 String documentId = extractDocumentId(existingDoc);
-                return new UpsertResponse(false, documentId, updateResult.getMatchedCount(), updateResult.getModifiedCount());
+                List<Document> refreshedDocuments = documentId != null
+                        ? repository.findByIds(collectionName, List.of(documentId))
+                        : List.of();
+                return new UpsertResponse(false, documentId,
+                        updateResult.getMatchedCount(), updateResult.getModifiedCount(), refreshedDocuments);
             }
 
             Map<String, Object> processed = subEntityProcessor.prepareForUpsertCreate(document, subEntities);
@@ -171,7 +191,12 @@ public class WriteService {
                     ? result.getUpsertedId().asObjectId().getValue().toString()
                     : null;
 
-            return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount());
+            List<Document> refreshedDocuments = documentId != null
+                    ? repository.findByIds(collectionName, List.of(documentId))
+                    : List.of();
+
+            return new UpsertResponse(wasInserted, documentId,
+                    result.getMatchedCount(), result.getModifiedCount(), refreshedDocuments);
         }
 
         document.put("isDeleted", false);
@@ -182,7 +207,12 @@ public class WriteService {
                 ? result.getUpsertedId().asObjectId().getValue().toString()
                 : null;
 
-        return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount());
+        List<Document> refreshedDocuments = documentId != null
+                ? repository.findByIds(collectionName, List.of(documentId))
+                : List.of();
+
+        return new UpsertResponse(wasInserted, documentId,
+                result.getMatchedCount(), result.getModifiedCount(), refreshedDocuments);
     }
 
     private Map<String, Object> sanitizeDocumentForWrite(Map<String, Object> source) {

@@ -131,6 +131,9 @@ System automatically injects these fields:
 ### 5. Primary Key Guarantee
 The `_id` field is ALWAYS filterable with `$eq` operator, regardless of ZooKeeper configuration. This ensures single-document operations are always possible.
 
+### 6. Response Payload Enrichment
+- All write responses include the freshly persisted document(s) so consumers immediately receive audit metadata, version counters, and soft-delete flags.
+
 ## 🏗️ Architecture
 
 ### Layered Design

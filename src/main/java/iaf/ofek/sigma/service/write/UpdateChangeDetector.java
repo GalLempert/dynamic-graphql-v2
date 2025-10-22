@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -47,7 +48,7 @@ public class UpdateChangeDetector {
                                      boolean updateMultiple) {
         if (updates == null || updates.isEmpty()) {
             logger.debug("No functional updates supplied; skipping update execution");
-            return EvaluationResult.noOp(0,
+            return EvaluationResult.noOp(Collections.emptyList(), 0,
                     "Update skipped because no functional fields were provided");
         }
 
@@ -56,7 +57,7 @@ public class UpdateChangeDetector {
 
         if (matchedCount == 0) {
             logger.debug("No documents matched the update query; proceeding without change detection");
-            return EvaluationResult.proceed();
+            return EvaluationResult.proceed(Collections.emptyList());
         }
 
         boolean anyChangeRequired = matchedDocuments.stream()
@@ -67,10 +68,10 @@ public class UpdateChangeDetector {
                     ? "Update skipped because all matched documents already contain the requested values"
                     : "Update skipped because the document already contains the requested values";
             logger.info(message + " (collection: {}, matched: {})", collectionName, matchedCount);
-            return EvaluationResult.noOp(matchedCount, message);
+            return EvaluationResult.noOp(matchedDocuments, matchedCount, message);
         }
 
-        return EvaluationResult.proceed();
+        return EvaluationResult.proceed(matchedDocuments);
     }
 
     private boolean hasEffectiveChanges(Document document, Map<String, Object> updates) {
@@ -130,19 +131,21 @@ public class UpdateChangeDetector {
         private final boolean noOp;
         private final long matchedCount;
         private final String message;
+        private final List<Document> matchedDocuments;
 
-        private EvaluationResult(boolean noOp, long matchedCount, String message) {
+        private EvaluationResult(boolean noOp, long matchedCount, String message, List<Document> matchedDocuments) {
             this.noOp = noOp;
             this.matchedCount = matchedCount;
             this.message = message;
+            this.matchedDocuments = matchedDocuments != null ? List.copyOf(matchedDocuments) : List.of();
         }
 
-        public static EvaluationResult noOp(long matchedCount, String message) {
-            return new EvaluationResult(true, matchedCount, message);
+        public static EvaluationResult noOp(List<Document> matchedDocuments, long matchedCount, String message) {
+            return new EvaluationResult(true, matchedCount, message, matchedDocuments);
         }
 
-        public static EvaluationResult proceed() {
-            return new EvaluationResult(false, 0, null);
+        public static EvaluationResult proceed(List<Document> matchedDocuments) {
+            return new EvaluationResult(false, matchedDocuments.size(), null, matchedDocuments);
         }
 
         public boolean isNoOp() {
@@ -155,6 +158,10 @@ public class UpdateChangeDetector {
 
         public Optional<String> getMessage() {
             return Optional.ofNullable(message);
+        }
+
+        public List<Document> getMatchedDocuments() {
+            return matchedDocuments;
         }
 
     }
