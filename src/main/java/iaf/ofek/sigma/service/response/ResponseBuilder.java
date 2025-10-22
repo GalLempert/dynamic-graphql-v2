@@ -84,6 +84,8 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         body.put("affectedCount", response.getAffectedCount());
         body.put("matchedCount", response.getMatchedCount());
         body.put("modifiedCount", response.getModifiedCount());
+        body.put("noOp", response.isNoOp());
+        response.getMessage().ifPresent(message -> body.put("message", message));
 
         return ResponseEntity.ok(body);
     }

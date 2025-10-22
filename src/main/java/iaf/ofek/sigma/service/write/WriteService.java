@@ -35,14 +35,17 @@ public class WriteService {
     private final DynamicMongoRepository repository;
     private final FilterTranslator filterTranslator;
     private final SubEntityProcessor subEntityProcessor;
+    private final UpdateChangeDetector updateChangeDetector;
     private final ThreadLocal<Endpoint> endpointContext = new ThreadLocal<>();
 
     public WriteService(DynamicMongoRepository repository,
                         FilterTranslator filterTranslator,
-                        SubEntityProcessor subEntityProcessor) {
+                        SubEntityProcessor subEntityProcessor,
+                        UpdateChangeDetector updateChangeDetector) {
         this.repository = repository;
         this.filterTranslator = filterTranslator;
         this.subEntityProcessor = subEntityProcessor;
+        this.updateChangeDetector = updateChangeDetector;
     }
 
     private Endpoint requireEndpointContext() {
@@ -103,8 +106,17 @@ public class WriteService {
         Query query = filterTranslator.translate(filterRequest);
 
         Map<String, Object> updates = sanitizeDocumentForWrite(request.getUpdates());
+        Supplier<Document> existingDocumentSupplier = memoizeDocumentSupplier(collectionName, query);
         applySubEntityUpdates(endpoint.getSubEntities(), updates, request.isUpdateMultiple(),
-                () -> loadSingleDocument(collectionName, query));
+                existingDocumentSupplier);
+
+        UpdateChangeDetector.EvaluationResult evaluation = updateChangeDetector.evaluate(
+                collectionName, query, updates, request.isUpdateMultiple());
+        if (evaluation.isNoOp()) {
+            return new UpdateResponse(evaluation.getMatchedCount(), 0,
+                    true, evaluation.getMessage().orElse(null));
+        }
+
         updates.put("latestRequestId", request.getRequestId());
 
         UpdateResult result = repository.update(collectionName, query, updates, request.isUpdateMultiple());
@@ -205,6 +217,22 @@ public class WriteService {
                                        boolean updateMultiple,
                                        Supplier<Document> existingDocumentSupplier) {
         subEntityProcessor.applyUpdateOperations(updates, subEntities, updateMultiple, existingDocumentSupplier);
+    }
+
+    private Supplier<Document> memoizeDocumentSupplier(String collectionName, Query query) {
+        return new Supplier<>() {
+            private Document cached;
+            private boolean loaded;
+
+            @Override
+            public synchronized Document get() {
+                if (!loaded) {
+                    cached = loadSingleDocument(collectionName, query);
+                    loaded = true;
+                }
+                return cached;
+            }
+        };
     }
 
     private Document loadSingleDocument(String collectionName, Query query) {

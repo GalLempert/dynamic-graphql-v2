@@ -228,7 +228,24 @@ Content-Type: application/json
   "success": true,
   "affectedCount": 3,
   "matchedCount": 3,
-  "modifiedCount": 3
+  "modifiedCount": 3,
+  "noOp": false
+}
+```
+
+If the requested values already exist on the matched document(s), the update is ignored so audit
+fields and optimistic locking counters remain untouched. The API responds with a descriptive
+payload so the caller understands why nothing changed:
+
+```json
+{
+  "type": "UPDATE",
+  "success": true,
+  "affectedCount": 0,
+  "matchedCount": 1,
+  "modifiedCount": 0,
+  "noOp": true,
+  "message": "Update skipped because the document already contains the requested values"
 }
 ```
 
