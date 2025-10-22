@@ -95,29 +95,29 @@ public class DynamicMongoRepository {
         // Stage 3: promote nested document as the root document
         pipeline.add(new Document("$replaceRoot", new Document("newRoot", "$" + fatherDocumentPath)));
 
-        if (query != null) {
-            Document matchStage = query.getQueryObject();
-            if (matchStage != null && !matchStage.isEmpty()) {
-                pipeline.add(new Document("$match", matchStage));
-            }
+        Query safeQuery = applyNotDeletedFilter(query);
 
-            Document projection = query.getFieldsObject();
-            if (projection != null && !projection.isEmpty()) {
-                pipeline.add(new Document("$project", projection));
-            }
+        Document matchStage = safeQuery.getQueryObject();
+        if (matchStage != null && !matchStage.isEmpty()) {
+            pipeline.add(new Document("$match", matchStage));
+        }
 
-            Document sort = query.getSortObject();
-            if (sort != null && !sort.isEmpty()) {
-                pipeline.add(new Document("$sort", sort));
-            }
+        Document projection = safeQuery.getFieldsObject();
+        if (projection != null && !projection.isEmpty()) {
+            pipeline.add(new Document("$project", projection));
+        }
 
-            if (query.getSkip() > 0) {
-                pipeline.add(new Document("$skip", query.getSkip()));
-            }
+        Document sort = safeQuery.getSortObject();
+        if (sort != null && !sort.isEmpty()) {
+            pipeline.add(new Document("$sort", sort));
+        }
 
-            if (query.getLimit() > 0) {
-                pipeline.add(new Document("$limit", query.getLimit()));
-            }
+        if (safeQuery.getSkip() > 0) {
+            pipeline.add(new Document("$skip", safeQuery.getSkip()));
+        }
+
+        if (safeQuery.getLimit() > 0) {
+            pipeline.add(new Document("$limit", safeQuery.getLimit()));
         }
 
         return mongoTemplate.getCollection(collectionName)
