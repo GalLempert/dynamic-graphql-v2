@@ -61,6 +61,13 @@ This application dynamically creates API endpoints based on configurations store
 - Sub-entity orchestration generates stable identifiers, supports create/update/delete semantics, and rehydrates payloads automatically
 - Validation blocks multi-document updates when a payload targets nested collections, protecting data integrity
 
+### 🧠 Dynamic Enum Management
+- Pulls enum definitions from an external enum service (configured via ZooKeeper `dataSource/enumURL`)
+- Hot-reloads enum catalog on a configurable schedule (`Globals/EnumRefreshIntervalSeconds`)
+- Optional fail-fast toggle (`Globals/FailOnEnumLoadFailure`) keeps bad configurations from serving traffic
+- Schemas can reference enums declaratively (`"enumRef": "countryCodes"`), with placeholders expanded into concrete `enum` arrays at runtime
+- Query responses automatically enrich enum-backed fields with both `code` and human-readable `value`
+
 ### 🔁 Change Stream Checkpointing
 - Sequence pagination stores resume tokens per collection for reliable change stream polling
 - Automatic checkpoint persistence (`_sequence_checkpoints` collection) enables seamless resume-after on restarts
@@ -143,6 +150,7 @@ HTTP Response
 │           └── {fieldName3}        # e.g., "name" → "$eq,$regex"
 │
 └── dataSource/
+    ├── enumURL                     # Base URL for external enum service
     └── mongodb/
         ├── connectionString
         ├── database
@@ -247,7 +255,34 @@ Content-Type: application/json
 ```
 Updates if user with email exists, creates new user if not.
 
-### 10. Custom Time Format
+### 10. Dynamic Enums in Requests & Responses
+```json
+// ZooKeeper schema snippet (schemas/user-schema.json)
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enumRef": "userStatus"
+    }
+  }
+}
+```
+The schema references the `userStatus` enum exposed by the external enum service. At runtime the placeholder is replaced with a
+standard JSON Schema `enum` array so validation works without static copies.
+
+```json
+// GET /api/users response fragment
+{
+  "status": {
+    "code": "ACTIVE",
+    "value": "Active"
+  }
+}
+```
+Responses automatically include both the persisted enum code and the human-friendly literal fetched from the enum catalog.
+
+### 11. Custom Time Format
 ```bash
 GET /api/users
 X-Time-Format: UNIX
