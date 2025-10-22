@@ -76,9 +76,12 @@ public class UpdateChangeDetector {
 
     private boolean hasEffectiveChanges(Document document, Map<String, Object> updates) {
         for (Map.Entry<String, Object> entry : updates.entrySet()) {
-            Object currentValue = readValue(document, entry.getKey());
+            ValueLookup currentValueLookup = readValue(document, entry.getKey());
             Object requestedValue = entry.getValue();
-            if (!areValuesEqual(currentValue, requestedValue)) {
+            if (!currentValueLookup.exists()) {
+                return true;
+            }
+            if (!areValuesEqual(currentValueLookup.value(), requestedValue)) {
                 return true;
             }
         }
@@ -92,28 +95,34 @@ public class UpdateChangeDetector {
         return Objects.equals(currentValue, requestedValue);
     }
 
-    private Object readValue(Object current, String path) {
+    private ValueLookup readValue(Object current, String path) {
         if (current == null || path == null) {
-            return null;
+            return ValueLookup.missing();
         }
         String[] segments = path.split("\\.");
         Object value = current;
         for (String segment : segments) {
             if (value instanceof Document document) {
+                if (!document.containsKey(segment)) {
+                    return ValueLookup.missing();
+                }
                 value = document.get(segment);
             } else if (value instanceof Map<?, ?> map) {
+                if (!map.containsKey(segment)) {
+                    return ValueLookup.missing();
+                }
                 value = map.get(segment);
             } else if (value instanceof List<?> list) {
                 Integer index = parseIndex(segment);
                 if (index == null || index < 0 || index >= list.size()) {
-                    return null;
+                    return ValueLookup.missing();
                 }
                 value = list.get(index);
             } else {
-                return null;
+                return ValueLookup.missing();
             }
         }
-        return value;
+        return ValueLookup.present(value);
     }
 
     private Integer parseIndex(String segment) {
@@ -121,6 +130,34 @@ public class UpdateChangeDetector {
             return Integer.valueOf(segment);
         } catch (NumberFormatException ex) {
             return null;
+        }
+    }
+
+    private static final class ValueLookup {
+        private static final ValueLookup MISSING = new ValueLookup(false, null);
+
+        private final boolean exists;
+        private final Object value;
+
+        private ValueLookup(boolean exists, Object value) {
+            this.exists = exists;
+            this.value = value;
+        }
+
+        static ValueLookup missing() {
+            return MISSING;
+        }
+
+        static ValueLookup present(Object value) {
+            return new ValueLookup(true, value);
+        }
+
+        boolean exists() {
+            return exists;
+        }
+
+        Object value() {
+            return value;
         }
     }
 
