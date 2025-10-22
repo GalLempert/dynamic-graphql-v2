@@ -1,4 +1,4 @@
-# Dynamic GraphQL v2
+# Dynamic Data Service
 
 <p align="center">
   <img src="docs/sigma-logo.svg" alt="Sigma Logo" width="220" />
