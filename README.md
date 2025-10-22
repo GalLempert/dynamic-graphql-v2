@@ -22,10 +22,13 @@ This application dynamically creates API endpoints based on configurations store
 ### ✍️ Write Operations (CREATE, UPDATE, DELETE, UPSERT)
 - Full CRUD support with HTTP method mapping (POST, PATCH, DELETE, PUT)
 - JSON Schema validation for data integrity
-- Automatic audit field injection (`_createdAt`, `_updatedAt`, `_lastRequestId`)
+- ACID transactions with optimistic locking prevent partial updates and lost writes
+- Automatic audit metadata (`version`, `createdAt`, `lastModifiedAt`, `createdBy`, `lastModifiedBy`, `latestRequestId`) managed by Spring Data
+- Soft deletes keep historical data (`isDeleted`) while automatically hiding records from reads
 - Filter support in write operations
-- Primary key (_id) always accessible for single-document operations
+- Primary key (`_id`) always accessible for single-document operations
 - Bulk insert support
+- Sub-entity aware payload processing for nested arrays (create/update/delete in a single request)
 
 ### 🔍 Advanced Filtering
 - MongoDB-style query operators (`$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$and`, `$or`, etc.)
@@ -45,6 +48,23 @@ This application dynamically creates API endpoints based on configurations store
 - Operator allowlists per field
 - Automatic request validation
 - Detailed error messages
+
+### 🛡️ ACID Transactions & Auditing
+- MongoDB transactions wrap every write operation for full atomicity and durability
+- Optimistic locking via `@Version` safeguards concurrent updates
+- Spring Data auditing automatically maintains `createdAt`, `lastModifiedAt`, `createdBy`, and `lastModifiedBy`
+- Request tracing persists the last mutating `X-Request-ID` (`latestRequestId`) on every document
+
+### 🧩 Nested Document & Sub-Entity Support
+- Configure nested endpoints with `fatherDocument` to expose array fields as first-class collections
+- Dedicated aggregation pipeline unwraps parent documents and applies filter/sort/pagination to nested items
+- Sub-entity orchestration generates stable identifiers, supports create/update/delete semantics, and rehydrates payloads automatically
+- Validation blocks multi-document updates when a payload targets nested collections, protecting data integrity
+
+### 🔁 Change Stream Checkpointing
+- Sequence pagination stores resume tokens per collection for reliable change stream polling
+- Automatic checkpoint persistence (`_sequence_checkpoints` collection) enables seamless resume-after on restarts
+- Responses include `nextSequence` and `hasMore` so consumers can iterate safely without missing events
 
 ### 🏗️ Clean Architecture
 - Protocol-agnostic service layer
@@ -195,7 +215,7 @@ X-Request-ID: req-123
   "age": 30
 }
 ```
-Creates a new user. Audit fields (`_createdAt`, `_updatedAt`, `_lastRequestId`) are automatically added.
+Creates a new user. Audit metadata (`createdAt`, `lastModifiedAt`, `createdBy`, `lastModifiedBy`, `latestRequestId`, `version`) is automatically populated inside the transaction.
 
 ### 7. UPDATE - Update by Filter (PATCH)
 ```bash
@@ -212,7 +232,7 @@ Updates user with specified _id. Only provided fields are updated.
 ```bash
 DELETE /api/users?role=guest
 ```
-Deletes all users with role "guest".
+Marks all users with role "guest" as logically deleted (`isDeleted=true`).
 
 ### 9. UPSERT - Update or Insert (PUT)
 ```bash
@@ -236,7 +256,7 @@ Returns timestamps in Unix format (seconds since epoch). See [Supported Time For
 
 ## Supported Time Formats
 
-You can customize the timestamp format in API responses by sending the `X-Time-Format` header with your request. All timestamp fields (`_createdAt`, `_updatedAt`) will be returned in the specified format.
+You can customize the timestamp format in API responses by sending the `X-Time-Format` header with your request. All timestamp fields (`createdAt`, `lastModifiedAt`) will be returned in the specified format.
 
 The system uses Java's standard `DateTimeFormatter`, supporting all standard Java time formats:
 
@@ -260,8 +280,8 @@ X-Time-Format: UNIX
   {
     "_id": "507f1f77bcf86cd799439011",
     "name": "Product A",
-    "_createdAt": 1729247400,
-    "_updatedAt": 1729247400
+    "createdAt": 1729247400,
+    "lastModifiedAt": 1729247400
   }
 ]
 ```
