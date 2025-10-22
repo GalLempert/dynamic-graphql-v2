@@ -2,6 +2,10 @@ package iaf.ofek.sigma.dto.response;
 
 import iaf.ofek.sigma.dto.request.WriteRequest;
 import lombok.Getter;
+import org.bson.Document;
+
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Response for UPSERT operations
@@ -14,12 +18,18 @@ public class UpsertResponse implements WriteResponse {
     private final String documentId;
     private final long matchedCount;
     private final long modifiedCount;
+    private final List<Document> documents;
 
-    public UpsertResponse(boolean wasInserted, String documentId, long matchedCount, long modifiedCount) {
+    public UpsertResponse(boolean wasInserted,
+                          String documentId,
+                          long matchedCount,
+                          long modifiedCount,
+                          List<Document> documents) {
         this.wasInserted = wasInserted;
         this.documentId = documentId;
         this.matchedCount = matchedCount;
         this.modifiedCount = modifiedCount;
+        this.documents = documents != null ? Collections.unmodifiableList(documents) : List.of();
     }
 
     @Override
@@ -35,6 +45,11 @@ public class UpsertResponse implements WriteResponse {
     @Override
     public long getAffectedCount() {
         return wasInserted ? 1 : modifiedCount;
+    }
+
+    @Override
+    public List<Document> getDocuments() {
+        return documents;
     }
 
     @Override

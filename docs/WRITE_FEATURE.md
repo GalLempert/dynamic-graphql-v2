@@ -6,6 +6,7 @@ The write feature enables clients to create, update, delete, and upsert document
 
 - **JSON Schema Validation** - Documents are validated against schemas stored in ZooKeeper
 - **Automatic Audit Fields** - System-managed fields are automatically injected
+- **Full Document Echo** - Every write response returns the latest persisted documents, including audit metadata
 - **Filter Support** - Write operations can target specific documents using filters
 - **Primary Key Access** - _id field is always filterable for single-document operations
 - **HTTP Method Mapping** - POST, PUT, PATCH, DELETE map to different write operations
@@ -170,7 +171,20 @@ Content-Type: application/json
   "type": "CREATE",
   "success": true,
   "affectedCount": 1,
-  "insertedIds": ["507f1f77bcf86cd799439011"]
+  "insertedIds": ["507f1f77bcf86cd799439011"],
+  "insertedCount": 1,
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "Alice",
+      "email": "alice@example.com",
+      "age": 30,
+      "createdAt": "2024-04-22T10:15:30Z",
+      "lastModifiedAt": "2024-04-22T10:15:30Z",
+      "version": 0,
+      "latestRequestId": "6b77fe34-0c6c-4a8b-8ee7-dfb9a7dd2a43"
+    }
+  ]
 }
 ```
 
@@ -191,7 +205,31 @@ Content-Type: application/json
   "type": "CREATE",
   "success": true,
   "affectedCount": 2,
-  "insertedIds": ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"]
+  "insertedIds": [
+    "507f1f77bcf86cd799439011",
+    "507f1f77bcf86cd799439012"
+  ],
+  "insertedCount": 2,
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "Alice",
+      "email": "alice@example.com",
+      "createdAt": "2024-04-22T10:15:30Z",
+      "lastModifiedAt": "2024-04-22T10:15:30Z",
+      "version": 0,
+      "latestRequestId": "6b77fe34-0c6c-4a8b-8ee7-dfb9a7dd2a43"
+    },
+    {
+      "_id": "507f1f77bcf86cd799439012",
+      "name": "Bob",
+      "email": "bob@example.com",
+      "createdAt": "2024-04-22T10:15:30Z",
+      "lastModifiedAt": "2024-04-22T10:15:30Z",
+      "version": 0,
+      "latestRequestId": "6b77fe34-0c6c-4a8b-8ee7-dfb9a7dd2a43"
+    }
+  ]
 }
 ```
 
@@ -228,7 +266,42 @@ Content-Type: application/json
   "success": true,
   "affectedCount": 3,
   "matchedCount": 3,
-  "modifiedCount": 3
+  "modifiedCount": 3,
+  "noOp": false,
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "status": "inactive",
+      "lastModifiedAt": "2024-05-01T09:02:12Z",
+      "version": 4,
+      "latestRequestId": "28f3f2be-952e-4f46-8d6d-2b2bb7633d67"
+    }
+  ]
+}
+```
+
+If the requested values already exist on the matched document(s), the update is ignored so audit
+fields and optimistic locking counters remain untouched. The API responds with a descriptive
+payload and echoes the current documents so the caller understands why nothing changed:
+
+```json
+{
+  "type": "UPDATE",
+  "success": true,
+  "affectedCount": 0,
+  "matchedCount": 1,
+  "modifiedCount": 0,
+  "noOp": true,
+  "message": "Update skipped because the document already contains the requested values",
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "status": "inactive",
+      "lastModifiedAt": "2024-05-01T09:02:12Z",
+      "version": 4,
+      "latestRequestId": "28f3f2be-952e-4f46-8d6d-2b2bb7633d67"
+    }
+  ]
 }
 ```
 
@@ -272,7 +345,16 @@ DELETE /api/users?status=inactive
   "type": "DELETE",
   "success": true,
   "affectedCount": 5,
-  "deletedCount": 5
+  "deletedCount": 5,
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "isDeleted": true,
+      "lastModifiedAt": "2024-05-10T18:44:03Z",
+      "version": 5,
+      "latestRequestId": "f10eaba2-8d87-4cc9-8b39-d8024616d2b9"
+    }
+  ]
 }
 ```
 
@@ -315,7 +397,18 @@ Content-Type: application/json
   "affectedCount": 1,
   "wasInserted": false,
   "matchedCount": 1,
-  "modifiedCount": 1
+  "modifiedCount": 1,
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "Alice Updated",
+      "email": "alice@example.com",
+      "age": 31,
+      "lastModifiedAt": "2024-05-12T16:21:09Z",
+      "version": 6,
+      "latestRequestId": "a12f020e-0ca7-47a1-bde9-bfba4324c189"
+    }
+  ]
 }
 ```
 
@@ -326,7 +419,19 @@ Content-Type: application/json
   "success": true,
   "affectedCount": 1,
   "wasInserted": true,
-  "documentId": "507f1f77bcf86cd799439011"
+  "documentId": "507f1f77bcf86cd799439011",
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "Alice Updated",
+      "email": "alice@example.com",
+      "age": 31,
+      "createdAt": "2024-05-12T16:21:09Z",
+      "lastModifiedAt": "2024-05-12T16:21:09Z",
+      "version": 0,
+      "latestRequestId": "a12f020e-0ca7-47a1-bde9-bfba4324c189"
+    }
+  ]
 }
 ```
 
@@ -466,7 +571,18 @@ Example validation error:
 7. Response → Client
    {
      "type": "CREATE",
-     "insertedIds": ["507f1f77bcf86cd799439011"]
+     "insertedIds": ["507f1f77bcf86cd799439011"],
+     "insertedCount": 1,
+     "documents": [
+       {
+         "_id": "507f1f77bcf86cd799439011",
+         "name": "Alice",
+         "email": "alice@example.com",
+         "_createdAt": "2025-10-18T10:30:00Z",
+         "_updatedAt": "2025-10-18T10:30:00Z",
+         "_lastRequestId": "req-12345"
+       }
+     ]
    }
 ```
 
@@ -505,7 +621,16 @@ Example validation error:
    {
      "type": "UPDATE",
      "matchedCount": 5,
-     "modifiedCount": 5
+     "modifiedCount": 5,
+     "noOp": false,
+     "documents": [
+       {
+         "_id": "507f1f77bcf86cd799439011",
+         "age": 31,
+         "_updatedAt": "2025-10-18T10:31:00Z",
+         "_lastRequestId": "req-12346"
+       }
+     ]
    }
 ```
 

@@ -88,21 +88,25 @@ public class EnumResponseTransformer {
 
         @Override
         public QueryResponse visitCreate(CreateResponse response) {
+            transformDocuments(response.getDocuments());
             return response;
         }
 
         @Override
         public QueryResponse visitUpdate(UpdateResponse response) {
+            transformDocuments(response.getDocuments());
             return response;
         }
 
         @Override
         public QueryResponse visitDelete(DeleteResponse response) {
+            transformDocuments(response.getDocuments());
             return response;
         }
 
         @Override
         public QueryResponse visitUpsert(UpsertResponse response) {
+            transformDocuments(response.getDocuments());
             return response;
         }
 

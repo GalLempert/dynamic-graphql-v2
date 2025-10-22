@@ -109,7 +109,7 @@ public class WriteService {
     public WriteResponse executeCreate(CreateRequest request, String collectionName) {
         // If this fails, entire transaction rolls back
         List<String> ids = repository.insertMany(collectionName, documents);
-        return new CreateResponse(ids);
+        return new CreateResponse(ids, repository.findByIds(collectionName, ids));
     }
 }
 ```
