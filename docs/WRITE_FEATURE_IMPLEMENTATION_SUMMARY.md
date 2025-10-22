@@ -7,34 +7,34 @@ The write feature has been fully implemented, enabling CREATE, UPDATE, DELETE, a
 ## 📁 Files Created (22 new files)
 
 ### Core Models
-1. `src/main/java/iaf/ofek/sigma/model/AuditFields.java` - Automatic audit field injection
-2. `src/main/java/iaf/ofek/sigma/model/schema/SchemaReference.java` - Schema reference model
-3. `src/main/java/iaf/ofek/sigma/model/schema/JsonSchema.java` - JSON Schema model
+1. `src/main/java/sigma/model/AuditFields.java` - Automatic audit field injection
+2. `src/main/java/sigma/model/schema/SchemaReference.java` - Schema reference model
+3. `src/main/java/sigma/model/schema/JsonSchema.java` - JSON Schema model
 
 ### Write Request DTOs
-4. `src/main/java/iaf/ofek/sigma/dto/request/WriteRequest.java` - Base write request interface
-5. `src/main/java/iaf/ofek/sigma/dto/request/CreateRequest.java` - CREATE operation
-6. `src/main/java/iaf/ofek/sigma/dto/request/UpdateRequest.java` - UPDATE operation
-7. `src/main/java/iaf/ofek/sigma/dto/request/DeleteRequest.java` - DELETE operation
-8. `src/main/java/iaf/ofek/sigma/dto/request/UpsertRequest.java` - UPSERT operation
+4. `src/main/java/sigma/dto/request/WriteRequest.java` - Base write request interface
+5. `src/main/java/sigma/dto/request/CreateRequest.java` - CREATE operation
+6. `src/main/java/sigma/dto/request/UpdateRequest.java` - UPDATE operation
+7. `src/main/java/sigma/dto/request/DeleteRequest.java` - DELETE operation
+8. `src/main/java/sigma/dto/request/UpsertRequest.java` - UPSERT operation
 
 ### Write Response DTOs
-9. `src/main/java/iaf/ofek/sigma/dto/response/WriteResponse.java` - Base write response interface
-10. `src/main/java/iaf/ofek/sigma/dto/response/CreateResponse.java` - CREATE result
-11. `src/main/java/iaf/ofek/sigma/dto/response/UpdateResponse.java` - UPDATE result
-12. `src/main/java/iaf/ofek/sigma/dto/response/DeleteResponse.java` - DELETE result
-13. `src/main/java/iaf/ofek/sigma/dto/response/UpsertResponse.java` - UPSERT result
+9. `src/main/java/sigma/dto/response/WriteResponse.java` - Base write response interface
+10. `src/main/java/sigma/dto/response/CreateResponse.java` - CREATE result
+11. `src/main/java/sigma/dto/response/UpdateResponse.java` - UPDATE result
+12. `src/main/java/sigma/dto/response/DeleteResponse.java` - DELETE result
+13. `src/main/java/sigma/dto/response/UpsertResponse.java` - UPSERT result
 
 ### Schema Services
-14. `src/main/java/iaf/ofek/sigma/service/schema/SchemaManager.java` - Load and cache schemas from ZooKeeper
-15. `src/main/java/iaf/ofek/sigma/service/schema/SchemaValidator.java` - Validate documents against JSON schemas
+14. `src/main/java/sigma/service/schema/SchemaManager.java` - Load and cache schemas from ZooKeeper
+15. `src/main/java/sigma/service/schema/SchemaValidator.java` - Validate documents against JSON schemas
 
 ### Write Services
-16. `src/main/java/iaf/ofek/sigma/service/write/WriteService.java` - Execute write operations
-17. `src/main/java/iaf/ofek/sigma/service/write/WriteValidator.java` - Validate write requests
+16. `src/main/java/sigma/service/write/WriteService.java` - Execute write operations
+17. `src/main/java/sigma/service/write/WriteValidator.java` - Validate write requests
 
 ### Orchestration
-18. `src/main/java/iaf/ofek/sigma/service/Orchestrator.java` - Unified orchestrator for read + write
+18. `src/main/java/sigma/service/Orchestrator.java` - Unified orchestrator for read + write
 
 ### Documentation
 19. `docs/WRITE_FEATURE.md` - Complete write feature guide (500+ lines)
@@ -43,35 +43,35 @@ The write feature has been fully implemented, enabling CREATE, UPDATE, DELETE, a
 
 ## 📝 Files Modified (6 files)
 
-1. **`src/main/java/iaf/ofek/sigma/model/Endpoint.java`**
+1. **`src/main/java/sigma/model/Endpoint.java`**
    - Added `schemaReference` field
    - Added `allowedWriteMethods` field
    - Added helper methods: `isWriteMethodAllowed()`, `requiresSchemaValidation()`
 
-2. **`src/main/java/iaf/ofek/sigma/controller/EndpointRegistry.java`**
+2. **`src/main/java/sigma/controller/EndpointRegistry.java`**
    - Added `loadSchemaReference()` method
    - Added `loadAllowedWriteMethods()` method
    - Updated `loadEndpoints()` to include schema and write methods
 
-3. **`src/main/java/iaf/ofek/sigma/model/filter/FilterConfig.java`**
+3. **`src/main/java/sigma/model/filter/FilterConfig.java`**
    - Updated `isFieldFilterable()` - primary key (_id) always filterable
    - Updated `isOperatorAllowed()` - primary key allows $eq
    - Updated `getAllowedOperators()` - returns $eq for primary key
 
-4. **`src/main/java/iaf/ofek/sigma/persistence/repository/DynamicMongoRepository.java`**
+4. **`src/main/java/sigma/persistence/repository/DynamicMongoRepository.java`**
    - Added `insertOne()` method
    - Added `insertMany()` method
    - Added `update()` method
    - Added `upsert()` method
    - Added `delete()` method
 
-5. **`src/main/java/iaf/ofek/sigma/controller/RestApiController.java`**
+5. **`src/main/java/sigma/controller/RestApiController.java`**
    - Updated to use new `Orchestrator` (renamed from QueryOrchestrator)
    - Added `handleWriteRequest()` method
    - Added `isWriteOperation()` helper method
    - Routes to either executeQuery() or executeWrite()
 
-6. **`src/main/java/iaf/ofek/sigma/service/request/RequestParser.java`**
+6. **`src/main/java/sigma/service/request/RequestParser.java`**
    - Added `parseWrite()` method
    - Added `parseCreateRequest()` method
    - Added `parseUpdateRequest()` method
@@ -79,7 +79,7 @@ The write feature has been fully implemented, enabling CREATE, UPDATE, DELETE, a
    - Added `parseUpsertRequest()` method
    - Added `extractFilterFromParams()` helper
 
-7. **`src/main/java/iaf/ofek/sigma/service/response/ResponseBuilder.java`**
+7. **`src/main/java/sigma/service/response/ResponseBuilder.java`**
    - Added `buildWrite()` method
    - Added `buildWriteResponse()` method
    - Added `buildCreateResponse()` method

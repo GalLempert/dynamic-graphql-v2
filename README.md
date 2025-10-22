@@ -1,5 +1,9 @@
 # Dynamic GraphQL v2
 
+<p align="center">
+  <img src="docs/sigma-logo.svg" alt="Sigma Logo" width="220" />
+</p>
+
 A **dynamic, configuration-driven API gateway** that serves REST and GraphQL APIs backed by MongoDB, with all endpoint configurations stored in ZooKeeper. Built with Spring Boot and designed for maximum flexibility and reusability.
 
 ## Overview
@@ -435,7 +439,7 @@ class UpsertRequest implements WriteRequest
 ## Project Structure
 
 ```
-src/main/java/iaf/ofek/sigma/
+src/main/java/sigma/
 ├── controller/              # Protocol adapters (REST, GraphQL)
 │   ├── RestApiController.java
 │   ├── GraphQLController.java

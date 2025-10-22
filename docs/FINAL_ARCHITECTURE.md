@@ -292,7 +292,7 @@ return formatForGrpc(response); // Protobuf format
 ## File Structure
 
 ```
-src/main/java/iaf/ofek/sigma/
+src/main/java/sigma/
 
 ├── controller/ (Protocol Adapters)
 │   ├── RestApiController.java (~25 lines)
