@@ -16,9 +16,11 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Supplier;
 import java.util.stream.Collectors;
@@ -35,14 +37,17 @@ public class WriteService {
     private final DynamicMongoRepository repository;
     private final FilterTranslator filterTranslator;
     private final SubEntityProcessor subEntityProcessor;
+    private final DocumentChangeDetector documentChangeDetector;
     private final ThreadLocal<Endpoint> endpointContext = new ThreadLocal<>();
 
     public WriteService(DynamicMongoRepository repository,
                         FilterTranslator filterTranslator,
-                        SubEntityProcessor subEntityProcessor) {
+                        SubEntityProcessor subEntityProcessor,
+                        DocumentChangeDetector documentChangeDetector) {
         this.repository = repository;
         this.filterTranslator = filterTranslator;
         this.subEntityProcessor = subEntityProcessor;
+        this.documentChangeDetector = documentChangeDetector;
     }
 
     private Endpoint requireEndpointContext() {
@@ -83,13 +88,18 @@ public class WriteService {
                 })
                 .collect(Collectors.toList());
 
+        List<String> insertedIds;
         if (request.isBulk()) {
-            List<String> insertedIds = repository.insertMany(collectionName, documents);
-            return new CreateResponse(insertedIds);
+            insertedIds = repository.insertMany(collectionName, documents);
+        } else {
+            insertedIds = List.of(repository.insertOne(collectionName, documents.get(0)));
         }
 
-        String insertedId = repository.insertOne(collectionName, documents.get(0));
-        return new CreateResponse(List.of(insertedId));
+        List<Map<String, Object>> responseDocs = loadDocumentsByIds(collectionName, insertedIds);
+        String message = request.isBulk()
+                ? "Documents created successfully."
+                : "Document created successfully.";
+        return new CreateResponse(insertedIds, responseDocs, message);
     }
 
     /**
@@ -103,12 +113,35 @@ public class WriteService {
         Query query = filterTranslator.translate(filterRequest);
 
         Map<String, Object> updates = sanitizeDocumentForWrite(request.getUpdates());
+        List<Document> matchingDocuments = repository.findWithQuery(collectionName, query);
+
+        if (matchingDocuments.isEmpty()) {
+            return new UpdateResponse(0, 0, List.of(), "No documents matched the provided filter.");
+        }
+
         applySubEntityUpdates(endpoint.getSubEntities(), updates, request.isUpdateMultiple(),
                 () -> loadSingleDocument(collectionName, query));
-        updates.put("latestRequestId", request.getRequestId());
 
-        UpdateResult result = repository.update(collectionName, query, updates, request.isUpdateMultiple());
-        return new UpdateResponse(result.getMatchedCount(), result.getModifiedCount());
+        DocumentChangeResult changeResult =
+                documentChangeDetector.evaluate(matchingDocuments, updates);
+
+        if (!changeResult.hasChanges()) {
+            List<Map<String, Object>> unchanged = convertDocuments(matchingDocuments);
+            return new UpdateResponse(matchingDocuments.size(), 0, unchanged,
+                    "No changes detected; documents remain unchanged.");
+        }
+
+        Map<String, Object> effectiveUpdates = new LinkedHashMap<>(updates);
+        effectiveUpdates.put("latestRequestId", request.getRequestId());
+
+        UpdateResult result = repository.update(collectionName, query, effectiveUpdates, request.isUpdateMultiple());
+
+        List<Object> ids = extractIds(matchingDocuments);
+        List<Map<String, Object>> updatedDocuments = convertDocuments(
+                repository.findByIds(collectionName, ids));
+
+        return new UpdateResponse(result.getMatchedCount(), result.getModifiedCount(), updatedDocuments,
+                "Documents updated successfully.");
     }
 
     /**
@@ -120,8 +153,18 @@ public class WriteService {
                 new sigma.model.filter.FilterRequest(request.getFilter(), null);
         Query query = filterTranslator.translate(filterRequest);
 
+        List<Document> documentsBeforeDelete = repository.findWithQuery(collectionName, query);
+        if (documentsBeforeDelete.isEmpty()) {
+            return new DeleteResponse(0, List.of(), "No documents matched the provided filter.");
+        }
+
         DeleteResult result = repository.delete(collectionName, query, request.isDeleteMultiple(), request.getRequestId());
-        return new DeleteResponse(result.getDeletedCount());
+
+        List<Object> ids = extractIds(documentsBeforeDelete);
+        List<Map<String, Object>> deletedDocuments = convertDocuments(
+                repository.findByIds(collectionName, ids));
+
+        return new DeleteResponse(result.getDeletedCount(), deletedDocuments, "Documents marked as deleted.");
     }
 
     /**
@@ -146,9 +189,27 @@ public class WriteService {
                 Map<String, Object> updates = new LinkedHashMap<>(document);
                 subEntityProcessor.applyUpsertUpdate(updates, subEntities, existingDoc);
 
-                UpdateResult updateResult = repository.update(collectionName, query, updates, false);
+                DocumentChangeResult changeResult =
+                        documentChangeDetector.evaluate(List.of(existingDoc), updates);
+
                 String documentId = extractDocumentId(existingDoc);
-                return new UpsertResponse(false, documentId, updateResult.getMatchedCount(), updateResult.getModifiedCount());
+
+                if (!changeResult.hasChanges()) {
+                    return new UpsertResponse(false, documentId, 1, 0,
+                            convertDocuments(List.of(existingDoc)),
+                            "No changes detected; document remains unchanged.");
+                }
+
+                Map<String, Object> effectiveUpdates = new LinkedHashMap<>(updates);
+                effectiveUpdates.put("latestRequestId", request.getRequestId());
+
+                UpdateResult updateResult = repository.update(collectionName, query, effectiveUpdates, false);
+
+                List<Map<String, Object>> updatedDocuments = convertDocuments(
+                        repository.findByIds(collectionName, List.of(documentId)));
+
+                return new UpsertResponse(false, documentId, updateResult.getMatchedCount(), updateResult.getModifiedCount(),
+                        updatedDocuments, "Document updated successfully.");
             }
 
             Map<String, Object> processed = subEntityProcessor.prepareForUpsertCreate(document, subEntities);
@@ -159,18 +220,41 @@ public class WriteService {
                     ? result.getUpsertedId().asObjectId().getValue().toString()
                     : null;
 
-            return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount());
+            List<Map<String, Object>> documents = wasInserted
+                    ? convertDocuments(repository.findByIds(collectionName, List.of(documentId)))
+                    : List.of();
+
+            String message = wasInserted
+                    ? "Document inserted successfully."
+                    : "Document updated successfully.";
+
+            return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount(),
+                    documents, message);
         }
 
         document.put("isDeleted", false);
         UpdateResult result = repository.upsert(collectionName, query, document);
 
         boolean wasInserted = result.getUpsertedId() != null;
-        String documentId = wasInserted
-                ? result.getUpsertedId().asObjectId().getValue().toString()
-                : null;
 
-        return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount());
+        String documentId = null;
+        List<Map<String, Object>> documents;
+
+        if (wasInserted) {
+            documentId = result.getUpsertedId().asObjectId().getValue().toString();
+            documents = convertDocuments(repository.findByIds(collectionName, List.of(documentId)));
+        } else {
+            List<Document> refreshed = repository.findWithQuery(collectionName, query);
+            documentId = extractDocumentIdFromQuery(refreshed);
+            documents = convertDocuments(refreshed);
+        }
+
+        String message = wasInserted
+                ? "Document inserted successfully."
+                : "Document updated successfully.";
+
+        return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount(),
+                documents, message);
     }
 
     private Map<String, Object> sanitizeDocumentForWrite(Map<String, Object> source) {
@@ -200,6 +284,13 @@ public class WriteService {
         return id != null ? id.toString() : null;
     }
 
+    private String extractDocumentIdFromQuery(List<Document> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return null;
+        }
+        return extractDocumentId(documents.get(0));
+    }
+
     private void applySubEntityUpdates(Set<String> subEntities,
                                        Map<String, Object> updates,
                                        boolean updateMultiple,
@@ -220,5 +311,32 @@ public class WriteService {
             throw new IllegalArgumentException("Multiple documents match filter; cannot apply sub-entity operations safely");
         }
         return documents.get(0);
+    }
+
+    private List<Map<String, Object>> convertDocuments(List<Document> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return List.of();
+        }
+        return documents.stream()
+                .filter(Objects::nonNull)
+                .map(doc -> new LinkedHashMap<String, Object>(doc))
+                .collect(Collectors.toList());
+    }
+
+    private List<Map<String, Object>> loadDocumentsByIds(String collectionName, List<String> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        List<Object> objectIds = ids.stream()
+                .map(id -> (Object) id)
+                .collect(Collectors.toList());
+        return convertDocuments(repository.findByIds(collectionName, objectIds));
+    }
+
+    private List<Object> extractIds(List<Document> documents) {
+        return documents.stream()
+                .map(doc -> doc.get("_id"))
+                .filter(Objects::nonNull)
+                .collect(Collectors.toList());
     }
 }
