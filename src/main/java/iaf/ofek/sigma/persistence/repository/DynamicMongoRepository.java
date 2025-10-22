@@ -66,6 +66,66 @@ public class DynamicMongoRepository {
     }
 
     /**
+     * Finds nested documents by treating the specified field as a collection on its own.
+     *
+     * <p>The implementation uses an aggregation pipeline:</p>
+     * <ol>
+     *     <li>Filters out logically deleted parent documents</li>
+     *     <li>Unwinds the nested field</li>
+     *     <li>Replaces the root with the nested document content</li>
+     *     <li>Applies filters, projections, pagination and sorting defined by the query</li>
+     * </ol>
+     *
+     * @param collectionName The collection hosting the nested documents
+     * @param query The query describing the desired filtering/sorting options
+     * @param fatherDocumentPath Path of the nested document array inside the parent document
+     * @return List of nested documents matching the query
+     */
+    public List<Document> findNestedDocuments(String collectionName, Query query, String fatherDocumentPath) {
+        logger.debug("Executing nested query on collection {} -> field {} with query {}", collectionName, fatherDocumentPath, query);
+
+        List<Document> pipeline = new ArrayList<>();
+
+        // Stage 1: filter out deleted parent documents
+        pipeline.add(new Document("$match", new Document("isDeleted", new Document("$ne", true))));
+
+        // Stage 2: unwind nested array
+        pipeline.add(new Document("$unwind", "$" + fatherDocumentPath));
+
+        // Stage 3: promote nested document as the root document
+        pipeline.add(new Document("$replaceRoot", new Document("newRoot", "$" + fatherDocumentPath)));
+
+        Query safeQuery = applyNotDeletedFilter(query);
+
+        Document matchStage = safeQuery.getQueryObject();
+        if (matchStage != null && !matchStage.isEmpty()) {
+            pipeline.add(new Document("$match", matchStage));
+        }
+
+        Document projection = safeQuery.getFieldsObject();
+        if (projection != null && !projection.isEmpty()) {
+            pipeline.add(new Document("$project", projection));
+        }
+
+        Document sort = safeQuery.getSortObject();
+        if (sort != null && !sort.isEmpty()) {
+            pipeline.add(new Document("$sort", sort));
+        }
+
+        if (safeQuery.getSkip() > 0) {
+            pipeline.add(new Document("$skip", safeQuery.getSkip()));
+        }
+
+        if (safeQuery.getLimit() > 0) {
+            pipeline.add(new Document("$limit", safeQuery.getLimit()));
+        }
+
+        return mongoTemplate.getCollection(collectionName)
+                .aggregate(pipeline)
+                .into(new ArrayList<>());
+    }
+
+    /**
      * Gets the next page of changes using Change Streams with sequence-based pagination
      */
     public Map<String, Object> getNextPageBySequence(String collectionName, long startSequence, int batchSize) {

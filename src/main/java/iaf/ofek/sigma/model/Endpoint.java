@@ -23,12 +23,13 @@ public class Endpoint {
     private final SchemaReference schemaReference;
     private final Set<String> allowedWriteMethods;
     private final Set<String> subEntities;
+    private final String fatherDocument;
 
     public Endpoint(String name, String path, String httpMethod, String databaseCollection,
                    EndpointType type, boolean sequenceEnabled, int defaultBulkSize,
                    FilterConfig readFilterConfig, FilterConfig writeFilterConfig,
                    SchemaReference schemaReference, Set<String> allowedWriteMethods,
-                   Set<String> subEntities) {
+                   Set<String> subEntities, String fatherDocument) {
         this.name = name;
         this.path = path;
         this.httpMethod = httpMethod;
@@ -41,6 +42,7 @@ public class Endpoint {
         this.schemaReference = schemaReference;
         this.allowedWriteMethods = allowedWriteMethods != null ? Set.copyOf(allowedWriteMethods) : Set.of();
         this.subEntities = subEntities != null ? Set.copyOf(subEntities) : Set.of();
+        this.fatherDocument = fatherDocument != null && !fatherDocument.isBlank() ? fatherDocument : null;
     }
 
     public String getName() {
@@ -100,6 +102,17 @@ public class Endpoint {
         return subEntities;
     }
 
+    public String getFatherDocument() {
+        return fatherDocument;
+    }
+
+    /**
+     * Indicates whether this endpoint represents a nested document list inside another collection
+     */
+    public boolean isNestedDocument() {
+        return fatherDocument != null;
+    }
+
     /**
      * Checks if a specific HTTP method is allowed for write operations
      */
@@ -136,6 +149,7 @@ public class Endpoint {
                 ", schemaReference=" + schemaReference +
                 ", allowedWriteMethods=" + allowedWriteMethods +
                 ", subEntities=" + subEntities +
+                ", fatherDocument='" + fatherDocument + '\'' +
                 '}';
     }
 
