@@ -45,7 +45,7 @@ This project has undergone a **comprehensive architectural refactoring** from a 
 ## File Structure
 
 ```
-src/main/java/iaf/ofek/sigma/
+src/main/java/sigma/
 
 ├── controller/
 │   ├── RestApiController.java (OLD - 225 lines)

@@ -13,23 +13,23 @@ Two complementary features deliver this capability:
 
 - Set `fatherDocument` on the endpoint to the dot-delimited path of the array field (e.g. `orders.items`).
 - Optionally provide a `subEntities` list describing nested collections that require write-time orchestration.
-- The registry flags the endpoint as nested, causing the query orchestrator to route requests through the nested strategy.【F:src/main/java/iaf/ofek/sigma/controller/EndpointRegistry.java†L61-L152】【F:src/main/java/iaf/ofek/sigma/model/Endpoint.java†L24-L116】
+- The registry flags the endpoint as nested, causing the query orchestrator to route requests through the nested strategy.【F:src/main/java/sigma/controller/EndpointRegistry.java†L61-L152】【F:src/main/java/sigma/model/Endpoint.java†L24-L116】
 
 ## Read Execution Flow
 
-1. `NestedDocumentQueryStrategy` verifies the endpoint exposes a `fatherDocument` path and refuses unsupported operations like sequence pagination.【F:src/main/java/iaf/ofek/sigma/service/query/strategy/NestedDocumentQueryStrategy.java†L21-L43】
+1. `NestedDocumentQueryStrategy` verifies the endpoint exposes a `fatherDocument` path and refuses unsupported operations like sequence pagination.【F:src/main/java/sigma/service/query/strategy/NestedDocumentQueryStrategy.java†L21-L43】
 2. The request's filter options are translated into a standard `Query` object.
 3. `DynamicMongoRepository.findNestedDocuments(...)` builds an aggregation pipeline that:
    - Excludes logically deleted parent documents.
    - Unwinds the targeted array field.
-   - Promotes the nested element to the top-level document for downstream filtering, projection, sorting, and pagination.【F:src/main/java/iaf/ofek/sigma/persistence/repository/DynamicMongoRepository.java†L62-L114】
+   - Promotes the nested element to the top-level document for downstream filtering, projection, sorting, and pagination.【F:src/main/java/sigma/persistence/repository/DynamicMongoRepository.java†L62-L114】
 4. The results are returned as if the nested array were a standalone collection, making client consumption straightforward.
 
 ## Sub-Entity Write Management
 
-- `WriteService` inspects the endpoint's `subEntities` set and delegates nested array operations to `SubEntityProcessor` before executing repository updates.【F:src/main/java/iaf/ofek/sigma/service/write/WriteService.java†L37-L210】
-- The processor normalizes payloads, generates stable IDs via `UuidSubEntityIdGenerator`, and composes per-collection commands to mutate nested arrays without clobbering sibling elements.【F:src/main/java/iaf/ofek/sigma/service/write/subentity/SubEntityProcessor.java†L1-L200】
-- For upserts, existing documents are loaded first so the processor can merge nested changes and avoid data loss; multi-document updates are rejected when sub-entity operations are requested to preserve deterministic results.【F:src/main/java/iaf/ofek/sigma/service/write/WriteService.java†L116-L209】
+- `WriteService` inspects the endpoint's `subEntities` set and delegates nested array operations to `SubEntityProcessor` before executing repository updates.【F:src/main/java/sigma/service/write/WriteService.java†L37-L210】
+- The processor normalizes payloads, generates stable IDs via `UuidSubEntityIdGenerator`, and composes per-collection commands to mutate nested arrays without clobbering sibling elements.【F:src/main/java/sigma/service/write/subentity/SubEntityProcessor.java†L1-L200】
+- For upserts, existing documents are loaded first so the processor can merge nested changes and avoid data loss; multi-document updates are rejected when sub-entity operations are requested to preserve deterministic results.【F:src/main/java/sigma/service/write/WriteService.java†L116-L209】
 
 ## Example Configuration
 

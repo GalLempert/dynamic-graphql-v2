@@ -129,13 +129,13 @@ public ValidationResult validate(QueryRequest request, Endpoint endpoint) {
 ```
 
 **Files Modified**:
-- `src/main/java/iaf/ofek/sigma/dto/request/QueryRequest.java` - Added 3 template methods
-- `src/main/java/iaf/ofek/sigma/dto/request/FullCollectionRequest.java` - Implemented methods
-- `src/main/java/iaf/ofek/sigma/dto/request/FilteredQueryRequest.java` - Implemented methods
-- `src/main/java/iaf/ofek/sigma/dto/request/SequenceQueryRequest.java` - Implemented methods
-- `src/main/java/iaf/ofek/sigma/service/query/QueryBuilder.java` - Removed switch
-- `src/main/java/iaf/ofek/sigma/service/query/QueryService.java` - Removed switch
-- `src/main/java/iaf/ofek/sigma/service/validation/RequestValidator.java` - Removed switch
+- `src/main/java/sigma/dto/request/QueryRequest.java` - Added 3 template methods
+- `src/main/java/sigma/dto/request/FullCollectionRequest.java` - Implemented methods
+- `src/main/java/sigma/dto/request/FilteredQueryRequest.java` - Implemented methods
+- `src/main/java/sigma/dto/request/SequenceQueryRequest.java` - Implemented methods
+- `src/main/java/sigma/service/query/QueryBuilder.java` - Removed switch
+- `src/main/java/sigma/service/query/QueryService.java` - Removed switch
+- `src/main/java/sigma/service/validation/RequestValidator.java` - Removed switch
 
 **Eliminated**: 3 switch statements
 
@@ -221,13 +221,13 @@ private String mapWriteTypeToHttpMethod(WriteRequest request) {
 ```
 
 **Files Modified**:
-- `src/main/java/iaf/ofek/sigma/dto/request/WriteRequest.java` - Added 2 template methods
-- `src/main/java/iaf/ofek/sigma/dto/request/CreateRequest.java` - Implemented methods
-- `src/main/java/iaf/ofek/sigma/dto/request/UpdateRequest.java` - Implemented methods
-- `src/main/java/iaf/ofek/sigma/dto/request/DeleteRequest.java` - Implemented methods
-- `src/main/java/iaf/ofek/sigma/dto/request/UpsertRequest.java` - Implemented methods
-- `src/main/java/iaf/ofek/sigma/service/write/WriteService.java` - Removed switch
-- `src/main/java/iaf/ofek/sigma/service/write/WriteValidator.java` - Removed switch
+- `src/main/java/sigma/dto/request/WriteRequest.java` - Added 2 template methods
+- `src/main/java/sigma/dto/request/CreateRequest.java` - Implemented methods
+- `src/main/java/sigma/dto/request/UpdateRequest.java` - Implemented methods
+- `src/main/java/sigma/dto/request/DeleteRequest.java` - Implemented methods
+- `src/main/java/sigma/dto/request/UpsertRequest.java` - Implemented methods
+- `src/main/java/sigma/service/write/WriteService.java` - Removed switch
+- `src/main/java/sigma/service/write/WriteValidator.java` - Removed switch
 
 **Eliminated**: 2 switch statements
 
@@ -305,10 +305,10 @@ public WriteRequest parseWrite(String method, String body, HttpServletRequest re
 - **No switch statement**: Map lookup is polymorphic
 
 **Files Created**:
-- `src/main/java/iaf/ofek/sigma/service/request/WriteRequestFactory.java` - Factory with strategies
+- `src/main/java/sigma/service/request/WriteRequestFactory.java` - Factory with strategies
 
 **Files Modified**:
-- `src/main/java/iaf/ofek/sigma/service/request/RequestParser.java` - Uses factory
+- `src/main/java/sigma/service/request/RequestParser.java` - Uses factory
 
 **Eliminated**: 1 switch statement
 
@@ -349,7 +349,7 @@ public class RestEndpointHandler implements EndpointHandler {
 // GraphQLEndpointHandler.java - similar
 
 // Endpoint.EndpointType enum
-public iaf.ofek.sigma.controller.EndpointHandler getHandler(
+public sigma.controller.EndpointHandler getHandler(
         RestEndpointHandler restHandler,
         GraphQLEndpointHandler graphQLHandler) {
     return switch (this) {  // Encapsulated in enum - acceptable
@@ -366,13 +366,13 @@ return handler.handle(method, relativePath, body, endpoint, request);
 **Note**: The switch in `EndpointType.getHandler()` is **encapsulated within the enum itself**, not in business logic. This is an acceptable edge case as it's internal enum dispatch logic.
 
 **Files Created**:
-- `src/main/java/iaf/ofek/sigma/controller/EndpointHandler.java` - Strategy interface
-- `src/main/java/iaf/ofek/sigma/controller/RestEndpointHandler.java` - REST strategy
-- `src/main/java/iaf/ofek/sigma/controller/GraphQLEndpointHandler.java` - GraphQL strategy
+- `src/main/java/sigma/controller/EndpointHandler.java` - Strategy interface
+- `src/main/java/sigma/controller/RestEndpointHandler.java` - REST strategy
+- `src/main/java/sigma/controller/GraphQLEndpointHandler.java` - GraphQL strategy
 
 **Files Modified**:
-- `src/main/java/iaf/ofek/sigma/model/Endpoint.java` - Added `getHandler()` to enum
-- `src/main/java/iaf/ofek/sigma/controller/ApiController.java` - Uses strategy
+- `src/main/java/sigma/model/Endpoint.java` - Added `getHandler()` to enum
+- `src/main/java/sigma/controller/ApiController.java` - Uses strategy
 
 **Eliminated**: 1 switch statement from business logic
 
@@ -534,9 +534,9 @@ public WriteResponse execute(WriteRequest request, String collectionName) {
 
 To verify zero switch in business logic:
 ```bash
-grep -rn "switch (" src/main/java/iaf/ofek/sigma/service/ \
-                     src/main/java/iaf/ofek/sigma/controller/ \
-                     src/main/java/iaf/ofek/sigma/dto/ | \
+grep -rn "switch (" src/main/java/sigma/service/ \
+                     src/main/java/sigma/controller/ \
+                     src/main/java/sigma/dto/ | \
     grep -v "//" | grep -v "/\*"
 ```
 

@@ -33,10 +33,10 @@ The registry expects configuration nodes to exist under the environment/service 
 
 ## Runtime Flow
 
-1. **Configuration bootstrap** – `ZookeeperConfigService` loads the complete service, data source, and globals trees and registers recursive watchers for future updates.【F:src/main/java/iaf/ofek/sigma/zookeeper/ZookeeperConfigService.java†L14-L109】【F:src/main/java/iaf/ofek/sigma/zookeeper/ZookeeperWatcher.java†L18-L90】
-2. **Endpoint materialization** – During startup `EndpointRegistry.loadEndpoints()` groups raw ZooKeeper values into strongly typed `Endpoint` records, including filter policies, schema references, sub-entity metadata, and nested document mappings.【F:src/main/java/iaf/ofek/sigma/controller/EndpointRegistry.java†L31-L153】
-3. **Request handling** – `RestApiController` and other adapters ask the registry for the `Endpoint` matching the incoming method/path pair and pass it to the `Orchestrator` for validation and execution.【F:src/main/java/iaf/ofek/sigma/controller/RestApiController.java†L24-L133】
-4. **Hot updates** – When ZooKeeper emits a change event, `ZookeeperWatcher` reloads the node and updates the in-memory configuration map, allowing higher layers to rebuild affected `Endpoint` objects on demand.【F:src/main/java/iaf/ofek/sigma/zookeeper/ZookeeperWatcher.java†L24-L90】
+1. **Configuration bootstrap** – `ZookeeperConfigService` loads the complete service, data source, and globals trees and registers recursive watchers for future updates.【F:src/main/java/sigma/zookeeper/ZookeeperConfigService.java†L14-L109】【F:src/main/java/sigma/zookeeper/ZookeeperWatcher.java†L18-L90】
+2. **Endpoint materialization** – During startup `EndpointRegistry.loadEndpoints()` groups raw ZooKeeper values into strongly typed `Endpoint` records, including filter policies, schema references, sub-entity metadata, and nested document mappings.【F:src/main/java/sigma/controller/EndpointRegistry.java†L31-L153】
+3. **Request handling** – `RestApiController` and other adapters ask the registry for the `Endpoint` matching the incoming method/path pair and pass it to the `Orchestrator` for validation and execution.【F:src/main/java/sigma/controller/RestApiController.java†L24-L133】
+4. **Hot updates** – When ZooKeeper emits a change event, `ZookeeperWatcher` reloads the node and updates the in-memory configuration map, allowing higher layers to rebuild affected `Endpoint` objects on demand.【F:src/main/java/sigma/zookeeper/ZookeeperWatcher.java†L24-L90】
 
 ## Adding or Updating Endpoints
 
@@ -48,9 +48,9 @@ The registry expects configuration nodes to exist under the environment/service 
 
 ## Failure Handling & Observability
 
-- Missing required properties (`path`, `httpMethod`, `databaseCollection`) are logged and the endpoint is skipped.【F:src/main/java/iaf/ofek/sigma/controller/EndpointRegistry.java†L61-L120】
-- All configuration mutations are logged with the path and new value, making it easy to trace updates coming from ZooKeeper administrators.【F:src/main/java/iaf/ofek/sigma/zookeeper/ZookeeperConfigService.java†L111-L141】
-- Endpoint cache contents can be inspected through `EndpointRegistry.getAllEndpoints()` for debugging or diagnostics.【F:src/main/java/iaf/ofek/sigma/controller/EndpointRegistry.java†L155-L172】
+- Missing required properties (`path`, `httpMethod`, `databaseCollection`) are logged and the endpoint is skipped.【F:src/main/java/sigma/controller/EndpointRegistry.java†L61-L120】
+- All configuration mutations are logged with the path and new value, making it easy to trace updates coming from ZooKeeper administrators.【F:src/main/java/sigma/zookeeper/ZookeeperConfigService.java†L111-L141】
+- Endpoint cache contents can be inspected through `EndpointRegistry.getAllEndpoints()` for debugging or diagnostics.【F:src/main/java/sigma/controller/EndpointRegistry.java†L155-L172】
 
 ## Next Steps
 

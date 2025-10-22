@@ -66,12 +66,12 @@ private String getResponseSize(QueryResponse response) {
 ```
 
 **Files Modified**:
-- `src/main/java/iaf/ofek/sigma/dto/response/QueryResponse.java` - Added abstract method
-- `src/main/java/iaf/ofek/sigma/dto/response/DocumentListResponse.java` - Implemented
-- `src/main/java/iaf/ofek/sigma/dto/response/SequenceResponse.java` - Implemented
-- `src/main/java/iaf/ofek/sigma/dto/response/ErrorResponse.java` - Implemented
-- `src/main/java/iaf/ofek/sigma/service/Orchestrator.java` - Removed instanceof
-- `src/main/java/iaf/ofek/sigma/service/QueryOrchestrator.java` - Removed instanceof
+- `src/main/java/sigma/dto/response/QueryResponse.java` - Added abstract method
+- `src/main/java/sigma/dto/response/DocumentListResponse.java` - Implemented
+- `src/main/java/sigma/dto/response/SequenceResponse.java` - Implemented
+- `src/main/java/sigma/dto/response/ErrorResponse.java` - Implemented
+- `src/main/java/sigma/service/Orchestrator.java` - Removed instanceof
+- `src/main/java/sigma/service/QueryOrchestrator.java` - Removed instanceof
 
 **Eliminated**: 4 instanceof checks
 
@@ -211,22 +211,22 @@ return responseBuilder.buildWrite(writeResponse);  // Type-safe!
 ```
 
 **Files Created**:
-- `src/main/java/iaf/ofek/sigma/dto/response/ResponseVisitor.java` - Visitor interface
-- `src/main/java/iaf/ofek/sigma/dto/response/Response.java` - Unified response interface
+- `src/main/java/sigma/dto/response/ResponseVisitor.java` - Visitor interface
+- `src/main/java/sigma/dto/response/Response.java` - Unified response interface
 
 **Files Modified**:
-- `src/main/java/iaf/ofek/sigma/dto/response/QueryResponse.java` - Added accept(), implements Response
-- `src/main/java/iaf/ofek/sigma/dto/response/WriteResponse.java` - Added accept(), extends Response
-- `src/main/java/iaf/ofek/sigma/dto/response/DocumentListResponse.java` - Implemented accept()
-- `src/main/java/iaf/ofek/sigma/dto/response/SequenceResponse.java` - Implemented accept()
-- `src/main/java/iaf/ofek/sigma/dto/response/ErrorResponse.java` - Implemented accept()
-- `src/main/java/iaf/ofek/sigma/dto/response/CreateResponse.java` - Implemented accept()
-- `src/main/java/iaf/ofek/sigma/dto/response/UpdateResponse.java` - Implemented accept()
-- `src/main/java/iaf/ofek/sigma/dto/response/DeleteResponse.java` - Implemented accept()
-- `src/main/java/iaf/ofek/sigma/dto/response/UpsertResponse.java` - Implemented accept()
-- `src/main/java/iaf/ofek/sigma/service/response/ResponseBuilder.java` - Implements visitor
-- `src/main/java/iaf/ofek/sigma/service/Orchestrator.java` - Returns Response type
-- `src/main/java/iaf/ofek/sigma/controller/RestApiController.java` - Uses Response type
+- `src/main/java/sigma/dto/response/QueryResponse.java` - Added accept(), implements Response
+- `src/main/java/sigma/dto/response/WriteResponse.java` - Added accept(), extends Response
+- `src/main/java/sigma/dto/response/DocumentListResponse.java` - Implemented accept()
+- `src/main/java/sigma/dto/response/SequenceResponse.java` - Implemented accept()
+- `src/main/java/sigma/dto/response/ErrorResponse.java` - Implemented accept()
+- `src/main/java/sigma/dto/response/CreateResponse.java` - Implemented accept()
+- `src/main/java/sigma/dto/response/UpdateResponse.java` - Implemented accept()
+- `src/main/java/sigma/dto/response/DeleteResponse.java` - Implemented accept()
+- `src/main/java/sigma/dto/response/UpsertResponse.java` - Implemented accept()
+- `src/main/java/sigma/service/response/ResponseBuilder.java` - Implements visitor
+- `src/main/java/sigma/service/Orchestrator.java` - Returns Response type
+- `src/main/java/sigma/controller/RestApiController.java` - Uses Response type
 
 **Eliminated**: 10+ instanceof checks
 
@@ -329,9 +329,9 @@ All tests compile successfully with zero instanceof in business logic layers.
 
 To verify zero instanceof in business logic:
 ```bash
-grep -rn "instanceof" src/main/java/iaf/ofek/sigma/service/ \
-                      src/main/java/iaf/ofek/sigma/controller/ \
-                      src/main/java/iaf/ofek/sigma/dto/ | \
+grep -rn "instanceof" src/main/java/sigma/service/ \
+                      src/main/java/sigma/controller/ \
+                      src/main/java/sigma/dto/ | \
     grep -v "// " | grep -v "/\*"
 ```
 

@@ -560,14 +560,14 @@ Example validation error:
 
 ### DTOs
 
-**Request DTOs** (`src/main/java/iaf/ofek/sigma/dto/request/`):
+**Request DTOs** (`src/main/java/sigma/dto/request/`):
 - `WriteRequest.java` - Base interface
 - `CreateRequest.java` - CREATE operation
 - `UpdateRequest.java` - UPDATE operation
 - `DeleteRequest.java` - DELETE operation
 - `UpsertRequest.java` - UPSERT operation
 
-**Response DTOs** (`src/main/java/iaf/ofek/sigma/dto/response/`):
+**Response DTOs** (`src/main/java/sigma/dto/response/`):
 - `WriteResponse.java` - Base interface
 - `CreateResponse.java` - CREATE result
 - `UpdateResponse.java` - UPDATE result
@@ -576,29 +576,29 @@ Example validation error:
 
 ### Services
 
-**Write Services** (`src/main/java/iaf/ofek/sigma/service/write/`):
+**Write Services** (`src/main/java/sigma/service/write/`):
 - `WriteService.java` - Executes write operations
 - `WriteValidator.java` - Validates write requests
 
-**Schema Services** (`src/main/java/iaf/ofek/sigma/service/schema/`):
+**Schema Services** (`src/main/java/sigma/service/schema/`):
 - `SchemaManager.java` - Loads and caches schemas from ZooKeeper
 - `SchemaValidator.java` - Validates documents against JSON schemas
 
-**Orchestration** (`src/main/java/iaf/ofek/sigma/service/`):
+**Orchestration** (`src/main/java/sigma/service/`):
 - `Orchestrator.java` - Main orchestrator for both read and write
 
 ### Models
 
-**Schema Models** (`src/main/java/iaf/ofek/sigma/model/schema/`):
+**Schema Models** (`src/main/java/sigma/model/schema/`):
 - `JsonSchema.java` - Represents a JSON schema
 - `SchemaReference.java` - Reference from endpoint to schema
 
-**Audit** (`src/main/java/iaf/ofek/sigma/model/`):
+**Audit** (`src/main/java/sigma/model/`):
 - `AuditFields.java` - System-managed audit field injection
 
 ### Repository
 
-**Write Methods** (`src/main/java/iaf/ofek/sigma/persistence/repository/`):
+**Write Methods** (`src/main/java/sigma/persistence/repository/`):
 - `DynamicMongoRepository.insertOne()` - Insert single document
 - `DynamicMongoRepository.insertMany()` - Bulk insert
 - `DynamicMongoRepository.update()` - Update documents
