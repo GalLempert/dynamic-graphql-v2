@@ -19,6 +19,8 @@ This application dynamically creates API endpoints based on configurations store
 - Endpoints configured entirely through ZooKeeper
 - Supports multiple endpoint types: REST, GraphQL (extensible to gRPC, WebSocket)
 
+Learn more in the [Dynamic Endpoint Creation guide](docs/DYNAMIC_ENDPOINTS.md).
+
 ### ✍️ Write Operations (CREATE, UPDATE, DELETE, UPSERT)
 - Full CRUD support with HTTP method mapping (POST, PATCH, DELETE, PUT)
 - JSON Schema validation for data integrity
@@ -42,12 +44,16 @@ This application dynamically creates API endpoints based on configurations store
 - Multi-field sorting
 - Field projection support
 
+Details live in [PAGINATION_AND_SORTING.md](docs/PAGINATION_AND_SORTING.md).
+
 ### 🔒 Configuration-Based Validation
 - JSON Schema validation for write operations
 - Field-level filtering rules
 - Operator allowlists per field
 - Automatic request validation
 - Detailed error messages
+
+See [CONFIGURATION_BASED_VALIDATION.md](docs/CONFIGURATION_BASED_VALIDATION.md) for the full pipeline.
 
 ### 🛡️ ACID Transactions & Auditing
 - MongoDB transactions wrap every write operation for full atomicity and durability
@@ -61,6 +67,8 @@ This application dynamically creates API endpoints based on configurations store
 - Sub-entity orchestration generates stable identifiers, supports create/update/delete semantics, and rehydrates payloads automatically
 - Validation blocks multi-document updates when a payload targets nested collections, protecting data integrity
 
+Dive deeper with [NESTED_DOCUMENT_SUPPORT.md](docs/NESTED_DOCUMENT_SUPPORT.md).
+
 ### 🧠 Dynamic Enum Management
 - Pulls enum definitions from an external enum service (configured via ZooKeeper `dataSource/enumURL`)
 - Hot-reloads enum catalog on a configurable schedule (`Globals/EnumRefreshIntervalSeconds`)
@@ -68,10 +76,14 @@ This application dynamically creates API endpoints based on configurations store
 - Schemas can reference enums declaratively (`"enumRef": "countryCodes"`), with placeholders expanded into concrete `enum` arrays at runtime
 - Query responses automatically enrich enum-backed fields with both `code` and human-readable `value`
 
+All implementation details are captured in [DYNAMIC_ENUM_MANAGEMENT.md](docs/DYNAMIC_ENUM_MANAGEMENT.md).
+
 ### 🔁 Change Stream Checkpointing
 - Sequence pagination stores resume tokens per collection for reliable change stream polling
 - Automatic checkpoint persistence (`_sequence_checkpoints` collection) enables seamless resume-after on restarts
 - Responses include `nextSequence` and `hasMore` so consumers can iterate safely without missing events
+
+Learn more in [CHANGE_STREAM_CHECKPOINTING.md](docs/CHANGE_STREAM_CHECKPOINTING.md).
 
 ### 🏗️ Clean Architecture
 - Protocol-agnostic service layer
@@ -577,6 +589,12 @@ Comprehensive documentation is available in the `docs/` folder:
 - **[ZOOKEEPER_SETUP.md](docs/ZOOKEEPER_SETUP.md)** - ⭐ ZooKeeper configuration with JSON Schema examples
 - **[FILTER_FEATURE.md](docs/FILTER_FEATURE.md)** - Filter feature documentation
 - **[FINAL_ARCHITECTURE.md](docs/FINAL_ARCHITECTURE.md)** - Complete architecture guide
+- **[DYNAMIC_ENDPOINTS.md](docs/DYNAMIC_ENDPOINTS.md)** - Runtime endpoint registry and ZooKeeper integration
+- **[PAGINATION_AND_SORTING.md](docs/PAGINATION_AND_SORTING.md)** - Pagination, sorting, projection, and sequence feeds
+- **[CONFIGURATION_BASED_VALIDATION.md](docs/CONFIGURATION_BASED_VALIDATION.md)** - Config-driven read/write validation pipeline
+- **[NESTED_DOCUMENT_SUPPORT.md](docs/NESTED_DOCUMENT_SUPPORT.md)** - Nested endpoint queries and sub-entity orchestration
+- **[DYNAMIC_ENUM_MANAGEMENT.md](docs/DYNAMIC_ENUM_MANAGEMENT.md)** - External enum synchronization and enrichment
+- **[CHANGE_STREAM_CHECKPOINTING.md](docs/CHANGE_STREAM_CHECKPOINTING.md)** - Resume tokens and sequence pagination checkpoints
 
 ### Architecture Documentation
 - **[ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md)** - Visual architecture diagrams
