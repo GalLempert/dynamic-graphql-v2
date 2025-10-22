@@ -19,13 +19,18 @@ This application dynamically creates API endpoints based on configurations store
 - Endpoints configured entirely through ZooKeeper
 - Supports multiple endpoint types: REST, GraphQL (extensible to gRPC, WebSocket)
 
+Learn more in the [Dynamic Endpoint Creation guide](docs/DYNAMIC_ENDPOINTS.md).
+
 ### ✍️ Write Operations (CREATE, UPDATE, DELETE, UPSERT)
 - Full CRUD support with HTTP method mapping (POST, PATCH, DELETE, PUT)
 - JSON Schema validation for data integrity
-- Automatic audit field injection (`_createdAt`, `_updatedAt`, `_lastRequestId`)
+- ACID transactions with optimistic locking prevent partial updates and lost writes
+- Automatic audit metadata (`version`, `createdAt`, `lastModifiedAt`, `createdBy`, `lastModifiedBy`, `latestRequestId`) managed by Spring Data
+- Soft deletes keep historical data (`isDeleted`) while automatically hiding records from reads
 - Filter support in write operations
-- Primary key (_id) always accessible for single-document operations
+- Primary key (`_id`) always accessible for single-document operations
 - Bulk insert support
+- Sub-entity aware payload processing for nested arrays (create/update/delete in a single request)
 
 ### 🔍 Advanced Filtering
 - MongoDB-style query operators (`$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$and`, `$or`, etc.)
@@ -39,12 +44,46 @@ This application dynamically creates API endpoints based on configurations store
 - Multi-field sorting
 - Field projection support
 
+Details live in [PAGINATION_AND_SORTING.md](docs/PAGINATION_AND_SORTING.md).
+
 ### 🔒 Configuration-Based Validation
 - JSON Schema validation for write operations
 - Field-level filtering rules
 - Operator allowlists per field
 - Automatic request validation
 - Detailed error messages
+
+See [CONFIGURATION_BASED_VALIDATION.md](docs/CONFIGURATION_BASED_VALIDATION.md) for the full pipeline.
+
+### 🛡️ ACID Transactions & Auditing
+- MongoDB transactions wrap every write operation for full atomicity and durability
+- Optimistic locking via `@Version` safeguards concurrent updates
+- Spring Data auditing automatically maintains `createdAt`, `lastModifiedAt`, `createdBy`, and `lastModifiedBy`
+- Request tracing persists the last mutating `X-Request-ID` (`latestRequestId`) on every document
+
+### 🧩 Nested Document & Sub-Entity Support
+- Configure nested endpoints with `fatherDocument` to expose array fields as first-class collections
+- Dedicated aggregation pipeline unwraps parent documents and applies filter/sort/pagination to nested items
+- Sub-entity orchestration generates stable identifiers, supports create/update/delete semantics, and rehydrates payloads automatically
+- Validation blocks multi-document updates when a payload targets nested collections, protecting data integrity
+
+Dive deeper with [NESTED_DOCUMENT_SUPPORT.md](docs/NESTED_DOCUMENT_SUPPORT.md).
+
+### 🧠 Dynamic Enum Management
+- Pulls enum definitions from an external enum service (configured via ZooKeeper `dataSource/enumURL`)
+- Hot-reloads enum catalog on a configurable schedule (`Globals/EnumRefreshIntervalSeconds`)
+- Optional fail-fast toggle (`Globals/FailOnEnumLoadFailure`) keeps bad configurations from serving traffic
+- Schemas can reference enums declaratively (`"enumRef": "countryCodes"`), with placeholders expanded into concrete `enum` arrays at runtime
+- Query responses automatically enrich enum-backed fields with both `code` and human-readable `value`
+
+All implementation details are captured in [DYNAMIC_ENUM_MANAGEMENT.md](docs/DYNAMIC_ENUM_MANAGEMENT.md).
+
+### 🔁 Change Stream Checkpointing
+- Sequence pagination stores resume tokens per collection for reliable change stream polling
+- Automatic checkpoint persistence (`_sequence_checkpoints` collection) enables seamless resume-after on restarts
+- Responses include `nextSequence` and `hasMore` so consumers can iterate safely without missing events
+
+Learn more in [CHANGE_STREAM_CHECKPOINTING.md](docs/CHANGE_STREAM_CHECKPOINTING.md).
 
 ### 🏗️ Clean Architecture
 - Protocol-agnostic service layer
@@ -123,6 +162,7 @@ HTTP Response
 │           └── {fieldName3}        # e.g., "name" → "$eq,$regex"
 │
 └── dataSource/
+    ├── enumURL                     # Base URL for external enum service
     └── mongodb/
         ├── connectionString
         ├── database
@@ -195,7 +235,7 @@ X-Request-ID: req-123
   "age": 30
 }
 ```
-Creates a new user. Audit fields (`_createdAt`, `_updatedAt`, `_lastRequestId`) are automatically added.
+Creates a new user. Audit metadata (`createdAt`, `lastModifiedAt`, `createdBy`, `lastModifiedBy`, `latestRequestId`, `version`) is automatically populated inside the transaction.
 
 ### 7. UPDATE - Update by Filter (PATCH)
 ```bash
@@ -212,7 +252,7 @@ Updates user with specified _id. Only provided fields are updated.
 ```bash
 DELETE /api/users?role=guest
 ```
-Deletes all users with role "guest".
+Marks all users with role "guest" as logically deleted (`isDeleted=true`).
 
 ### 9. UPSERT - Update or Insert (PUT)
 ```bash
@@ -227,7 +267,34 @@ Content-Type: application/json
 ```
 Updates if user with email exists, creates new user if not.
 
-### 10. Custom Time Format
+### 10. Dynamic Enums in Requests & Responses
+```json
+// ZooKeeper schema snippet (schemas/user-schema.json)
+{
+  "type": "object",
+  "properties": {
+    "status": {
+      "type": "string",
+      "enumRef": "userStatus"
+    }
+  }
+}
+```
+The schema references the `userStatus` enum exposed by the external enum service. At runtime the placeholder is replaced with a
+standard JSON Schema `enum` array so validation works without static copies.
+
+```json
+// GET /api/users response fragment
+{
+  "status": {
+    "code": "ACTIVE",
+    "value": "Active"
+  }
+}
+```
+Responses automatically include both the persisted enum code and the human-friendly literal fetched from the enum catalog.
+
+### 11. Custom Time Format
 ```bash
 GET /api/users
 X-Time-Format: UNIX
@@ -236,7 +303,7 @@ Returns timestamps in Unix format (seconds since epoch). See [Supported Time For
 
 ## Supported Time Formats
 
-You can customize the timestamp format in API responses by sending the `X-Time-Format` header with your request. All timestamp fields (`_createdAt`, `_updatedAt`) will be returned in the specified format.
+You can customize the timestamp format in API responses by sending the `X-Time-Format` header with your request. All timestamp fields (`createdAt`, `lastModifiedAt`) will be returned in the specified format.
 
 The system uses Java's standard `DateTimeFormatter`, supporting all standard Java time formats:
 
@@ -260,8 +327,8 @@ X-Time-Format: UNIX
   {
     "_id": "507f1f77bcf86cd799439011",
     "name": "Product A",
-    "_createdAt": 1729247400,
-    "_updatedAt": 1729247400
+    "createdAt": 1729247400,
+    "lastModifiedAt": 1729247400
   }
 ]
 ```
@@ -522,6 +589,12 @@ Comprehensive documentation is available in the `docs/` folder:
 - **[ZOOKEEPER_SETUP.md](docs/ZOOKEEPER_SETUP.md)** - ⭐ ZooKeeper configuration with JSON Schema examples
 - **[FILTER_FEATURE.md](docs/FILTER_FEATURE.md)** - Filter feature documentation
 - **[FINAL_ARCHITECTURE.md](docs/FINAL_ARCHITECTURE.md)** - Complete architecture guide
+- **[DYNAMIC_ENDPOINTS.md](docs/DYNAMIC_ENDPOINTS.md)** - Runtime endpoint registry and ZooKeeper integration
+- **[PAGINATION_AND_SORTING.md](docs/PAGINATION_AND_SORTING.md)** - Pagination, sorting, projection, and sequence feeds
+- **[CONFIGURATION_BASED_VALIDATION.md](docs/CONFIGURATION_BASED_VALIDATION.md)** - Config-driven read/write validation pipeline
+- **[NESTED_DOCUMENT_SUPPORT.md](docs/NESTED_DOCUMENT_SUPPORT.md)** - Nested endpoint queries and sub-entity orchestration
+- **[DYNAMIC_ENUM_MANAGEMENT.md](docs/DYNAMIC_ENUM_MANAGEMENT.md)** - External enum synchronization and enrichment
+- **[CHANGE_STREAM_CHECKPOINTING.md](docs/CHANGE_STREAM_CHECKPOINTING.md)** - Resume tokens and sequence pagination checkpoints
 
 ### Architecture Documentation
 - **[ARCHITECTURE_DIAGRAM.md](docs/ARCHITECTURE_DIAGRAM.md)** - Visual architecture diagrams
