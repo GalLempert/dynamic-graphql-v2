@@ -35,6 +35,15 @@ Learn more in the [Dynamic Endpoint Creation guide](docs/DYNAMIC_ENDPOINTS.md).
 - Primary key (`_id`) always accessible for single-document operations
 - Bulk insert support
 - Sub-entity aware payload processing for nested arrays (create/update/delete in a single request)
+- Intelligent dirty-checking prevents unnecessary version/timestamp bumps when submitted values match stored data
+- Every write response returns the affected document(s) and a descriptive outcome message so clients always see the latest state
+
+#### Response Payload
+
+All write endpoints now respond with:
+
+- `message` – a human-readable explanation of the operation result
+- `documents` – the up-to-date document snapshots reflecting the state that was written (or skipped)
 
 ### 🔍 Advanced Filtering
 - MongoDB-style query operators (`$eq`, `$gt`, `$gte`, `$lt`, `$lte`, `$in`, `$and`, `$or`, etc.)

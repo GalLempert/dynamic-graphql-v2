@@ -170,7 +170,17 @@ Content-Type: application/json
   "type": "CREATE",
   "success": true,
   "affectedCount": 1,
-  "insertedIds": ["507f1f77bcf86cd799439011"]
+  "insertedIds": ["507f1f77bcf86cd799439011"],
+  "insertedCount": 1,
+  "message": "Document created successfully.",
+  "documents": [
+    {
+      "_id": "507f1f77bcf86cd799439011",
+      "name": "Alice",
+      "email": "alice@example.com",
+      "isDeleted": false
+    }
+  ]
 }
 ```
 
@@ -191,7 +201,16 @@ Content-Type: application/json
   "type": "CREATE",
   "success": true,
   "affectedCount": 2,
-  "insertedIds": ["507f1f77bcf86cd799439011", "507f1f77bcf86cd799439012"]
+  "insertedIds": [
+    "507f1f77bcf86cd799439011",
+    "507f1f77bcf86cd799439012"
+  ],
+  "insertedCount": 2,
+  "message": "Documents created successfully.",
+  "documents": [
+    { "_id": "507f1f77bcf86cd799439011", "name": "Alice" },
+    { "_id": "507f1f77bcf86cd799439012", "name": "Bob" }
+  ]
 }
 ```
 
@@ -228,9 +247,14 @@ Content-Type: application/json
   "success": true,
   "affectedCount": 3,
   "matchedCount": 3,
-  "modifiedCount": 3
+  "modifiedCount": 3,
+  "message": "Documents updated successfully.",
+  "documents": [
+    { "_id": "507f1f77bcf86cd799439011", "status": "inactive" }
+  ]
 }
 ```
+> If the submitted values already match the stored data, the response returns `modifiedCount: 0` with a message such as `"No changes detected; documents remain unchanged."` while leaving the original documents untouched.
 
 **Complex Filter (POST body)**:
 ```bash
@@ -272,7 +296,11 @@ DELETE /api/users?status=inactive
   "type": "DELETE",
   "success": true,
   "affectedCount": 5,
-  "deletedCount": 5
+  "deletedCount": 5,
+  "message": "Documents marked as deleted.",
+  "documents": [
+    { "_id": "507f1f77bcf86cd799439011", "isDeleted": true }
+  ]
 }
 ```
 
@@ -315,7 +343,12 @@ Content-Type: application/json
   "affectedCount": 1,
   "wasInserted": false,
   "matchedCount": 1,
-  "modifiedCount": 1
+  "modifiedCount": 1,
+  "documentId": "507f1f77bcf86cd799439011",
+  "message": "Document updated successfully.",
+  "documents": [
+    { "_id": "507f1f77bcf86cd799439011", "name": "Alice Updated" }
+  ]
 }
 ```
 
@@ -326,7 +359,11 @@ Content-Type: application/json
   "success": true,
   "affectedCount": 1,
   "wasInserted": true,
-  "documentId": "507f1f77bcf86cd799439011"
+  "documentId": "507f1f77bcf86cd799439011",
+  "message": "Document inserted successfully.",
+  "documents": [
+    { "_id": "507f1f77bcf86cd799439011", "name": "Alice Updated" }
+  ]
 }
 ```
 

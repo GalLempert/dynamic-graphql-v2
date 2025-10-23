@@ -7,6 +7,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -72,6 +73,7 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         body.put("affectedCount", response.getAffectedCount());
         body.put("insertedIds", response.getInsertedIds());
         body.put("insertedCount", response.getInsertedCount());
+        applyWriteMetadata(body, response);
 
         return ResponseEntity.status(HttpStatus.CREATED).body(body);
     }
@@ -84,6 +86,7 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         body.put("affectedCount", response.getAffectedCount());
         body.put("matchedCount", response.getMatchedCount());
         body.put("modifiedCount", response.getModifiedCount());
+        applyWriteMetadata(body, response);
 
         return ResponseEntity.ok(body);
     }
@@ -95,6 +98,7 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         body.put("success", response.isSuccess());
         body.put("affectedCount", response.getAffectedCount());
         body.put("deletedCount", response.getDeletedCount());
+        applyWriteMetadata(body, response);
 
         return ResponseEntity.ok(body);
     }
@@ -112,7 +116,12 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
         } else {
             body.put("matchedCount", response.getMatchedCount());
             body.put("modifiedCount", response.getModifiedCount());
+            if (response.getDocumentId() != null) {
+                body.put("documentId", response.getDocumentId());
+            }
         }
+
+        applyWriteMetadata(body, response);
 
         HttpStatus status = response.isWasInserted() ? HttpStatus.CREATED : HttpStatus.OK;
         return ResponseEntity.status(status).body(body);
@@ -147,5 +156,16 @@ public class ResponseBuilder implements ResponseVisitor<ResponseEntity<?>> {
      */
     public ResponseEntity<?> buildWrite(sigma.dto.response.Response response) {
         return response.accept(this);
+    }
+
+    private void applyWriteMetadata(Map<String, Object> body, WriteResponse response) {
+        if (response.getMessage() != null && !response.getMessage().isBlank()) {
+            body.put("message", response.getMessage());
+        }
+
+        List<Map<String, Object>> documents = response.getDocuments();
+        if (documents != null) {
+            body.put("documents", timeFormatter.formatDocuments(documents));
+        }
     }
 }

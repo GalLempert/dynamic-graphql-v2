@@ -3,6 +3,9 @@ package sigma.dto.response;
 import sigma.dto.request.WriteRequest;
 import lombok.Getter;
 
+import java.util.List;
+import java.util.Map;
+
 /**
  * Response for UPSERT operations
  * Contains information about whether document was inserted or updated
@@ -14,12 +17,21 @@ public class UpsertResponse implements WriteResponse {
     private final String documentId;
     private final long matchedCount;
     private final long modifiedCount;
+    private final List<Map<String, Object>> documents;
+    private final String message;
 
-    public UpsertResponse(boolean wasInserted, String documentId, long matchedCount, long modifiedCount) {
+    public UpsertResponse(boolean wasInserted,
+                          String documentId,
+                          long matchedCount,
+                          long modifiedCount,
+                          List<Map<String, Object>> documents,
+                          String message) {
         this.wasInserted = wasInserted;
         this.documentId = documentId;
         this.matchedCount = matchedCount;
         this.modifiedCount = modifiedCount;
+        this.documents = documents;
+        this.message = message;
     }
 
     @Override
@@ -35,6 +47,16 @@ public class UpsertResponse implements WriteResponse {
     @Override
     public long getAffectedCount() {
         return wasInserted ? 1 : modifiedCount;
+    }
+
+    @Override
+    public List<Map<String, Object>> getDocuments() {
+        return documents;
+    }
+
+    @Override
+    public String getMessage() {
+        return message;
     }
 
     @Override

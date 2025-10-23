@@ -4,6 +4,7 @@ import sigma.dto.request.WriteRequest;
 import lombok.Getter;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Response for CREATE operations
@@ -14,10 +15,14 @@ public class CreateResponse implements WriteResponse {
 
     private final List<String> insertedIds;
     private final long insertedCount;
+    private final List<Map<String, Object>> documents;
+    private final String message;
 
-    public CreateResponse(List<String> insertedIds) {
+    public CreateResponse(List<String> insertedIds, List<Map<String, Object>> documents, String message) {
         this.insertedIds = insertedIds;
         this.insertedCount = insertedIds.size();
+        this.documents = documents;
+        this.message = message;
     }
 
     @Override
@@ -33,6 +38,16 @@ public class CreateResponse implements WriteResponse {
     @Override
     public long getAffectedCount() {
         return insertedCount;
+    }
+
+    @Override
+    public List<Map<String, Object>> getDocuments() {
+        return documents;
+    }
+
+    @Override
+    public String getMessage() {
+        return message;
     }
 
     @Override

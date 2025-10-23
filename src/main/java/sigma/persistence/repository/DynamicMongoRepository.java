@@ -66,6 +66,34 @@ public class DynamicMongoRepository {
     }
 
     /**
+     * Finds documents without applying the logical deletion filter. Intended for
+     * operational flows that must inspect soft-deleted records (e.g. response
+     * payloads after delete operations).
+     */
+    public List<Document> findRaw(String collectionName, Query query) {
+        Query effectiveQuery = query != null ? query : new Query();
+        logger.debug("Executing raw query on collection {}: {}", collectionName, effectiveQuery);
+        return mongoTemplate.find(effectiveQuery, Document.class, collectionName);
+    }
+
+    /**
+     * Loads documents by their identifiers without applying any extra filters.
+     *
+     * @param collectionName The collection to query
+     * @param ids            Identifiers to load
+     * @return Matching documents in the same order as returned by MongoDB
+     */
+    public List<Document> findByIds(String collectionName, List<Object> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+
+        logger.debug("Fetching {} documents by id from collection {}", ids.size(), collectionName);
+        Query query = new Query(Criteria.where("_id").in(ids));
+        return mongoTemplate.find(query, Document.class, collectionName);
+    }
+
+    /**
      * Finds nested documents by treating the specified field as a collection on its own.
      *
      * <p>The implementation uses an aggregation pipeline:</p>
@@ -374,7 +402,9 @@ public class DynamicMongoRepository {
      */
     private Query applyNotDeletedFilter(Query query) {
         Query effectiveQuery = query != null ? query : new Query();
-        effectiveQuery.getQueryObject().remove("isDeleted");
+        if (effectiveQuery.getQueryObject().containsKey("isDeleted")) {
+            effectiveQuery.getQueryObject().remove("isDeleted");
+        }
         effectiveQuery.addCriteria(Criteria.where("isDeleted").ne(true));
         return effectiveQuery;
     }
