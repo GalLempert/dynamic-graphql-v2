@@ -233,15 +233,22 @@ public class WriteService {
         }
 
         document.put("isDeleted", false);
+
+        List<Document> existingDocuments = repository.findWithQuery(collectionName, query);
+        String existingDocumentId = extractDocumentIdFromQuery(existingDocuments);
+
         UpdateResult result = repository.upsert(collectionName, query, document);
 
         boolean wasInserted = result.getUpsertedId() != null;
 
-        String documentId = null;
+        String documentId;
         List<Map<String, Object>> documents;
 
         if (wasInserted) {
             documentId = result.getUpsertedId().asObjectId().getValue().toString();
+            documents = convertDocuments(repository.findByIds(collectionName, List.of(documentId)));
+        } else if (existingDocumentId != null) {
+            documentId = existingDocumentId;
             documents = convertDocuments(repository.findByIds(collectionName, List.of(documentId)));
         } else {
             List<Document> refreshed = repository.findWithQuery(collectionName, query);
