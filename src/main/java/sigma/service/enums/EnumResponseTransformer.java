@@ -57,11 +57,11 @@ public class EnumResponseTransformer {
             return response;
         }
 
-        ResponseVisitor<QueryResponse> visitor = new Visitor(bindings);
-        return response.accept(visitor);
+        ResponseVisitor<Response> visitor = new Visitor(bindings);
+        return (QueryResponse) response.accept(visitor);
     }
 
-    private class Visitor implements ResponseVisitor<QueryResponse> {
+    private class Visitor implements ResponseVisitor<Response> {
 
         private final List<EnumFieldBinding> bindings;
 
@@ -70,39 +70,39 @@ public class EnumResponseTransformer {
         }
 
         @Override
-        public QueryResponse visitDocumentList(DocumentListResponse response) {
+        public Response visitDocumentList(DocumentListResponse response) {
             transformDocuments(response.getDocuments());
             return response;
         }
 
         @Override
-        public QueryResponse visitSequence(SequenceResponse response) {
+        public Response visitSequence(SequenceResponse response) {
             transformDocuments(response.getData());
             return response;
         }
 
         @Override
-        public QueryResponse visitError(ErrorResponse response) {
+        public Response visitError(ErrorResponse response) {
             return response;
         }
 
         @Override
-        public QueryResponse visitCreate(CreateResponse response) {
+        public Response visitCreate(CreateResponse response) {
             return response;
         }
 
         @Override
-        public QueryResponse visitUpdate(UpdateResponse response) {
+        public Response visitUpdate(UpdateResponse response) {
             return response;
         }
 
         @Override
-        public QueryResponse visitDelete(DeleteResponse response) {
+        public Response visitDelete(DeleteResponse response) {
             return response;
         }
 
         @Override
-        public QueryResponse visitUpsert(UpsertResponse response) {
+        public Response visitUpsert(UpsertResponse response) {
             return response;
         }
 
