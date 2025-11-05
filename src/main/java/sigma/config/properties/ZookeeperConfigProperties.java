@@ -102,6 +102,10 @@ public class ZookeeperConfigProperties {
         return seconds * 1000;
     }
 
+    public boolean isEnumServiceEnabled() {
+        return getGlobalPropertyAsBoolean("EnableEnumService", Boolean.TRUE);
+    }
+
     // ========== Helper Methods ==========
 
     /**

@@ -86,6 +86,7 @@ Dive deeper with [NESTED_DOCUMENT_SUPPORT.md](docs/NESTED_DOCUMENT_SUPPORT.md).
 - Pulls enum definitions from an external enum service (configured via ZooKeeper `dataSource/enumURL`)
 - Hot-reloads enum catalog on a configurable schedule (`Globals/EnumRefreshIntervalSeconds`)
 - Optional fail-fast toggle (`Globals/FailOnEnumLoadFailure`) keeps bad configurations from serving traffic
+- Development-friendly toggle (`Globals/EnableEnumService`) lets you disable enum fetching when the external service isn't available
 - Schemas can reference enums declaratively (`"enumRef": "countryCodes"`), with placeholders expanded into concrete `enum` arrays at runtime
 - Query responses automatically enrich enum-backed fields with both `code` and human-readable `value`
 

@@ -65,6 +65,13 @@ create /dev/dataSource/mongodb.password ""
 create /dev/dataSource/mongodb.authDatabase "admin"
 
 # ========================================
+# Globals Configuration
+# ========================================
+
+create /dev/Globals ""
+create /dev/Globals/EnableEnumService "true"
+
+# ========================================
 # Notes:
 # ========================================
 # 1. Replace /dev with your actual ENV value (e.g., /prod, /staging)

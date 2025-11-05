@@ -54,6 +54,10 @@ zkCli.sh -server $ZOOKEEPER_HOST create /dev/dataSource/mongodb.username ""
 zkCli.sh -server $ZOOKEEPER_HOST create /dev/dataSource/mongodb.password ""
 zkCli.sh -server $ZOOKEEPER_HOST create /dev/dataSource/mongodb.authDatabase "admin"
 
+# Globals configuration
+zkCli.sh -server $ZOOKEEPER_HOST create /dev/Globals ""
+zkCli.sh -server $ZOOKEEPER_HOST create /dev/Globals/EnableEnumService "true"
+
 echo "Zookeeper configuration imported successfully!"
 echo ""
 echo "To verify, run:"

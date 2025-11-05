@@ -42,6 +42,10 @@ public class EnumResponseTransformer {
             return response;
         }
 
+        if (!enumRegistry.isEnabled()) {
+            return response;
+        }
+
         SchemaReference schemaReference = endpoint.getSchemaReference();
         if (schemaReference == null) {
             return response;
