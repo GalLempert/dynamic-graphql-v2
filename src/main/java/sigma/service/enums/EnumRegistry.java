@@ -36,6 +36,12 @@ public class EnumRegistry {
 
     @PostConstruct
     public void initialize() {
+        if (!isEnabled()) {
+            enums.set(Map.of());
+            logger.info("Enum service disabled via feature toggle; skipping initialization");
+            return;
+        }
+
         boolean success = reloadEnums();
         if (!success && configProperties.shouldFailOnEnumLoadFailure()) {
             throw new IllegalStateException("Failed to load enum definitions from enum service");
@@ -59,7 +65,23 @@ public class EnumRegistry {
         listeners.add(listener);
     }
 
+    public boolean isEnabled() {
+        return configProperties.isEnumServiceEnabled();
+    }
+
     private boolean reloadEnums() {
+        if (!isEnabled()) {
+            Map<String, DynamicEnum> current = enums.get();
+            if (!current.isEmpty()) {
+                enums.set(Map.of());
+                logger.info("Enum service disabled via feature toggle; cleared {} cached enums", current.size());
+                listeners.forEach(EnumRegistryListener::onEnumsReloaded);
+            } else {
+                logger.debug("Enum service disabled via feature toggle; skipping enum reload");
+            }
+            return true;
+        }
+
         String enumUrl = configProperties.getEnumServiceUrl();
         if (enumUrl == null || enumUrl.isBlank()) {
             logger.warn("Enum service URL is not configured in ZooKeeper");

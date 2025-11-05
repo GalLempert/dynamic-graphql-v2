@@ -92,6 +92,14 @@
               "data": "admin"
             }
           }
+        },
+        "/dev/Globals": {
+          "data": "",
+          "children": {
+            "/dev/Globals/EnableEnumService": {
+              "data": "true"
+            }
+          }
         }
       }
     }

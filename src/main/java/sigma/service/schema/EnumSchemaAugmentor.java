@@ -29,11 +29,12 @@ public class EnumSchemaAugmentor {
 
     public Result augment(ObjectNode schemaNode) {
         List<EnumFieldBinding> bindings = new ArrayList<>();
-        traverse(schemaNode, new ArrayDeque<>(), bindings);
+        boolean enumsEnabled = enumRegistry.isEnabled();
+        traverse(schemaNode, new ArrayDeque<>(), bindings, enumsEnabled);
         return new Result(schemaNode, bindings);
     }
 
-    private void traverse(JsonNode node, Deque<EnumFieldPointer.Segment> path, List<EnumFieldBinding> bindings) {
+    private void traverse(JsonNode node, Deque<EnumFieldPointer.Segment> path, List<EnumFieldBinding> bindings, boolean enumsEnabled) {
         if (node == null || !node.isObject()) {
             return;
         }
@@ -41,14 +42,18 @@ public class EnumSchemaAugmentor {
         ObjectNode objectNode = (ObjectNode) node;
         if (objectNode.has(ENUM_REF_FIELD)) {
             String enumName = objectNode.get(ENUM_REF_FIELD).asText();
-            DynamicEnum dynamicEnum = enumRegistry.getEnum(enumName)
-                    .orElseThrow(() -> new IllegalStateException("Enum '" + enumName + "' not found for schema placeholder"));
+            if (!enumsEnabled) {
+                objectNode.remove(ENUM_REF_FIELD);
+            } else {
+                DynamicEnum dynamicEnum = enumRegistry.getEnum(enumName)
+                        .orElseThrow(() -> new IllegalStateException("Enum '" + enumName + "' not found for schema placeholder"));
 
-            ArrayNode enumValues = objectNode.putArray("enum");
-            dynamicEnum.getValuesByCode().values().forEach(value -> enumValues.add(value.getCode()));
-            objectNode.remove(ENUM_REF_FIELD);
+                ArrayNode enumValues = objectNode.putArray("enum");
+                dynamicEnum.getValuesByCode().values().forEach(value -> enumValues.add(value.getCode()));
+                objectNode.remove(ENUM_REF_FIELD);
 
-            bindings.add(new EnumFieldBinding(new EnumFieldPointer(List.copyOf(path)), enumName));
+                bindings.add(new EnumFieldBinding(new EnumFieldPointer(List.copyOf(path)), enumName));
+            }
         }
 
         if (objectNode.has("properties")) {
@@ -56,7 +61,7 @@ public class EnumSchemaAugmentor {
             if (propertiesNode.isObject()) {
                 propertiesNode.fields().forEachRemaining(entry -> {
                     path.addLast(new EnumFieldPointer.PropertySegment(entry.getKey()));
-                    traverse(entry.getValue(), path, bindings);
+                    traverse(entry.getValue(), path, bindings, enumsEnabled);
                     path.removeLast();
                 });
             }
@@ -65,7 +70,7 @@ public class EnumSchemaAugmentor {
         if (objectNode.has("items")) {
             JsonNode itemsNode = objectNode.get("items");
             path.addLast(EnumFieldPointer.ArraySegment.INSTANCE);
-            traverse(itemsNode, path, bindings);
+            traverse(itemsNode, path, bindings, enumsEnabled);
             path.removeLast();
         }
 
@@ -73,7 +78,7 @@ public class EnumSchemaAugmentor {
             JsonNode allOfNode = objectNode.get("allOf");
             if (allOfNode.isArray()) {
                 for (JsonNode item : allOfNode) {
-                    traverse(item, path, bindings);
+                    traverse(item, path, bindings, enumsEnabled);
                 }
             }
         }
@@ -82,7 +87,7 @@ public class EnumSchemaAugmentor {
             JsonNode anyOfNode = objectNode.get("anyOf");
             if (anyOfNode.isArray()) {
                 for (JsonNode item : anyOfNode) {
-                    traverse(item, path, bindings);
+                    traverse(item, path, bindings, enumsEnabled);
                 }
             }
         }
