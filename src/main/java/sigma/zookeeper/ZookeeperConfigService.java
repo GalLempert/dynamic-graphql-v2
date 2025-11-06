@@ -4,7 +4,10 @@ import jakarta.annotation.PostConstruct;
 import org.apache.zookeeper.KeeperException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Service;
+import sigma.zookeeper.event.ZookeeperNodeRemovedEvent;
+import sigma.zookeeper.event.ZookeeperNodeUpdatedEvent;
 
 import java.nio.charset.StandardCharsets;
 import java.util.Map;
@@ -101,21 +104,17 @@ public class ZookeeperConfigService {
         logger.info("Watchers set up on {} tree", treeName);
     }
 
-    /**
-     * Updates a node in the configuration
-     */
-    public void updateNode(String path, byte[] data) {
-        configuration.put(path, data);
-        String value = data != null ? new String(data, StandardCharsets.UTF_8) : "null";
-        logger.info("Configuration updated: {} = {}", path, value);
+    @EventListener
+    public void handleNodeUpdated(ZookeeperNodeUpdatedEvent event) {
+        configuration.put(event.path(), event.data());
+        String value = event.data() != null ? new String(event.data(), StandardCharsets.UTF_8) : "null";
+        logger.info("Configuration updated: {} = {}", event.path(), value);
     }
 
-    /**
-     * Removes a node from the configuration
-     */
-    public void removeNode(String path) {
-        configuration.remove(path);
-        logger.info("Configuration removed: {}", path);
+    @EventListener
+    public void handleNodeRemoved(ZookeeperNodeRemovedEvent event) {
+        configuration.remove(event.path());
+        logger.info("Configuration removed: {}", event.path());
     }
 
     /**

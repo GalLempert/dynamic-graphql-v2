@@ -6,7 +6,10 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
+import sigma.zookeeper.event.ZookeeperNodeRemovedEvent;
+import sigma.zookeeper.event.ZookeeperNodeUpdatedEvent;
 
 import java.util.List;
 
@@ -15,11 +18,11 @@ public class ZookeeperWatcher implements Watcher {
 
     private static final Logger logger = LoggerFactory.getLogger(ZookeeperWatcher.class);
     private final ZooKeeper zooKeeper;
-    private final ZookeeperConfigService configService;
+    private final ApplicationEventPublisher eventPublisher;
 
-    public ZookeeperWatcher(ZooKeeper zooKeeper, ZookeeperConfigService configService) {
+    public ZookeeperWatcher(ZooKeeper zooKeeper, ApplicationEventPublisher eventPublisher) {
         this.zooKeeper = zooKeeper;
-        this.configService = configService;
+        this.eventPublisher = eventPublisher;
     }
 
     @Override
@@ -35,7 +38,7 @@ public class ZookeeperWatcher implements Watcher {
                 }
                 case NodeDeleted -> {
                     logger.info("Node deleted: {}", event.getPath());
-                    configService.removeNode(event.getPath());
+                    eventPublisher.publishEvent(new ZookeeperNodeRemovedEvent(event.getPath()));
                 }
                 case NodeDataChanged -> {
                     logger.info("Node data changed: {}", event.getPath());
@@ -83,7 +86,7 @@ public class ZookeeperWatcher implements Watcher {
 
     private void handleNodeChange(String path) throws KeeperException, InterruptedException {
         byte[] data = zooKeeper.getData(path, this, null);
-        configService.updateNode(path, data);
+        eventPublisher.publishEvent(new ZookeeperNodeUpdatedEvent(path, data));
     }
 
     private void handleChildrenChange(String path) throws KeeperException, InterruptedException {
