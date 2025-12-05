@@ -55,8 +55,8 @@ class WriteValidatorTest {
     @BeforeEach
     void setUp() {
         writeValidator = new WriteValidator(filterValidator, schemaValidator);
-        when(endpoint.getName()).thenReturn("test-endpoint");
-        when(endpoint.getWriteFilterConfig()).thenReturn(writeFilterConfig);
+        lenient().when(endpoint.getName()).thenReturn("test-endpoint");
+        lenient().when(endpoint.getWriteFilterConfig()).thenReturn(writeFilterConfig);
     }
     
     /**
@@ -78,8 +78,8 @@ class WriteValidatorTest {
         when(endpoint.isWriteMethodAllowed("POST")).thenReturn(true);
         when(endpoint.requiresSchemaValidation()).thenReturn(true);
         when(endpoint.getSchemaReference()).thenReturn(schemaReference);
-        when(schemaReference.getSchemaName()).thenReturn("user-schema");
-        when(filterValidator.validate(any(), any())).thenReturn(List.of());
+        lenient().when(schemaReference.getSchemaName()).thenReturn("user-schema");
+        lenient().when(filterValidator.validate(any(), any())).thenReturn(List.of());
         when(schemaValidator.validateBulk(anyList(), anyString()))
             .thenReturn(SchemaValidator.ValidationResult.success());
         
@@ -278,8 +278,8 @@ class WriteValidatorTest {
         when(endpoint.isWriteMethodAllowed("POST")).thenReturn(true);
         when(endpoint.requiresSchemaValidation()).thenReturn(true);
         when(endpoint.getSchemaReference()).thenReturn(schemaReference);
-        when(schemaReference.getSchemaName()).thenReturn("user-schema");
-        when(filterValidator.validate(any(), any())).thenReturn(List.of());
+        lenient().when(schemaReference.getSchemaName()).thenReturn("user-schema");
+        lenient().when(filterValidator.validate(any(), any())).thenReturn(List.of());
         when(schemaValidator.validateBulk(anyList(), anyString()))
             .thenReturn(SchemaValidator.ValidationResult.failure(
                 List.of("age: expected integer, got string")

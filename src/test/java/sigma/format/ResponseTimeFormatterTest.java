@@ -42,7 +42,7 @@ class ResponseTimeFormatterTest {
     @BeforeEach
     void setUp() {
         formatter = new ResponseTimeFormatter(registry);
-        when(registry.getStrategy(anyString())).thenReturn(strategy);
+        lenient().when(registry.getStrategy(anyString())).thenReturn(strategy);
     }
 
     @AfterEach
