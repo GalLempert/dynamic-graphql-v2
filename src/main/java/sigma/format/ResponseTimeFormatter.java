@@ -4,6 +4,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
+import java.time.Instant;
+import java.util.Date;
 import java.util.List;
 import java.util.Map;
 
@@ -69,13 +71,23 @@ public class ResponseTimeFormatter {
      */
     private void formatField(Map<String, Object> document, String fieldName, TimeFormatStrategy strategy) {
         Object value = document.get(fieldName);
-        
-        if (value instanceof String timestampStr) {
+
+        String timestampStr = null;
+
+        if (value instanceof String str) {
+            timestampStr = str;
+        } else if (value instanceof Date date) {
+            timestampStr = date.toInstant().toString();
+        } else if (value instanceof Instant instant) {
+            timestampStr = instant.toString();
+        }
+
+        if (timestampStr != null) {
             try {
                 String formatted = strategy.format(timestampStr);
                 document.put(fieldName, formatted);
             } catch (Exception e) {
-                logger.warn("Failed to format timestamp field '{}' with value '{}': {}", 
+                logger.warn("Failed to format timestamp field '{}' with value '{}': {}",
                         fieldName, timestampStr, e.getMessage());
                 // Leave original value on error
             }
