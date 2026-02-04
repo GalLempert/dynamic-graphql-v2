@@ -1,6 +1,6 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 /**
  * Exists operator: $exists
@@ -12,11 +12,12 @@ public class ExistsOperator extends ComparisonOperator {
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
+    public SqlPredicate apply(String fieldName, Object value) {
+        boolean shouldExist = true;
         if (value instanceof Boolean) {
-            return Criteria.where(fieldName).exists((Boolean) value);
+            shouldExist = (Boolean) value;
         }
-        throw new IllegalArgumentException("$exists operator requires a boolean value");
+        return SqlPredicate.jsonbExists(fieldName, shouldExist);
     }
 
     @Override

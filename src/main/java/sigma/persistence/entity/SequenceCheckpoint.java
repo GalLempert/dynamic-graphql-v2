@@ -1,21 +1,32 @@
 package sigma.persistence.entity;
 
-import org.bson.BsonDocument;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 
 /**
- * Stores checkpoint information for Change Stream sequences
+ * Stores checkpoint information for sequence-based pagination
+ * Used to track the last processed sequence for each table/collection
  */
-@Document(collection = "_sequence_checkpoints")
+@Entity
+@Table(name = "sequence_checkpoints")
 public class SequenceCheckpoint {
 
     @Id
-    private String id; // collectionName
+    @Column(name = "id")
+    private String id; // collectionName used as ID
 
+    @Column(name = "collection_name", nullable = false, unique = true)
     private String collectionName;
+
+    @Column(name = "sequence")
     private long sequence;
-    private String resumeToken; // Stored as JSON string
+
+    @Column(name = "resume_token")
+    private String resumeToken; // Stored as JSON string or timestamp
+
+    @Column(name = "last_updated")
     private long lastUpdated;
 
     public SequenceCheckpoint() {

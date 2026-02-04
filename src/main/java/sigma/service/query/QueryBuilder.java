@@ -3,11 +3,11 @@ package sigma.service.query;
 import sigma.dto.request.FilteredQueryRequest;
 import sigma.dto.request.QueryRequest;
 import sigma.filter.FilterTranslator;
-import org.springframework.data.mongodb.core.query.Query;
+import sigma.model.filter.FilterResult;
 import org.springframework.stereotype.Service;
 
 /**
- * Builds MongoDB Query objects from QueryRequest objects
+ * Builds FilterResult objects from QueryRequest objects for PostgreSQL
  * Single Responsibility: Query translation
  */
 @Service
@@ -24,27 +24,27 @@ public class QueryBuilder {
     }
 
     /**
-     * Builds a MongoDB Query from a QueryRequest
+     * Builds a FilterResult from a QueryRequest
      * Uses polymorphism - ZERO switch statements!
      *
      * @param request The request to translate
-     * @return MongoDB Query object (null for sequence-based queries)
+     * @return FilterResult (null for sequence-based queries)
      */
-    public Query build(QueryRequest request) {
+    public FilterResult build(QueryRequest request) {
         return request.buildQuery(this);
     }
 
     /**
-     * Builds a query for full collection retrieval
+     * Builds a filter result for full collection retrieval
      */
-    private Query buildFullCollectionQuery() {
-        return new Query();
+    private FilterResult buildFullCollectionQuery() {
+        return FilterResult.builder().build();
     }
 
     /**
-     * Builds a query for filtered requests
+     * Builds a filter result for filtered requests
      */
-    private Query buildFilteredQuery(FilteredQueryRequest request) {
+    private FilterResult buildFilteredQuery(FilteredQueryRequest request) {
         return filterTranslator.translate(request.getFilterRequest());
     }
 }

@@ -1,21 +1,21 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 /**
  * Base class for comparison operators
  */
 public abstract class ComparisonOperator implements OperatorStrategy {
 
-    private final String mongoOperator;
+    private final String operator;
 
-    protected ComparisonOperator(String mongoOperator) {
-        this.mongoOperator = mongoOperator;
+    protected ComparisonOperator(String operator) {
+        this.operator = operator;
     }
 
     @Override
-    public String getMongoOperator() {
-        return mongoOperator;
+    public String getOperator() {
+        return operator;
     }
 
     @Override

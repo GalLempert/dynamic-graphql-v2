@@ -1,6 +1,6 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 /**
  * Equality operator: $eq
@@ -12,7 +12,7 @@ public class EqualOperator extends ComparisonOperator {
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
-        return Criteria.where(fieldName).is(value);
+    public SqlPredicate apply(String fieldName, Object value) {
+        return SqlPredicate.jsonbEquals(fieldName, value);
     }
 }

@@ -1,9 +1,10 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 /**
  * Regex operator: $regex
+ * In PostgreSQL, this is converted to a LIKE pattern
  */
 public class RegexOperator extends ComparisonOperator {
 
@@ -12,7 +13,7 @@ public class RegexOperator extends ComparisonOperator {
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
-        return Criteria.where(fieldName).regex(value.toString());
+    public SqlPredicate apply(String fieldName, Object value) {
+        return SqlPredicate.jsonbRegex(fieldName, value);
     }
 }

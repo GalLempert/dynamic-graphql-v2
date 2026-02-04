@@ -1,9 +1,9 @@
 package sigma.dto.response;
 
 import lombok.Getter;
-import org.bson.Document;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Response containing a list of documents
@@ -11,9 +11,9 @@ import java.util.List;
 @Getter
 public class DocumentListResponse extends QueryResponse {
 
-    private final List<Document> documents;
+    private final List<Map<String, Object>> documents;
 
-    public DocumentListResponse(List<Document> documents) {
+    public DocumentListResponse(List<Map<String, Object>> documents) {
         super(true, null);
         this.documents = documents;
     }

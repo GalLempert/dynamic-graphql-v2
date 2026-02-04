@@ -1,6 +1,6 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 import java.util.List;
 
@@ -14,9 +14,9 @@ public class NotInOperator extends ComparisonOperator {
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
+    public SqlPredicate apply(String fieldName, Object value) {
         if (value instanceof List) {
-            return Criteria.where(fieldName).nin((List<?>) value);
+            return SqlPredicate.jsonbNotIn(fieldName, (List<?>) value);
         }
         throw new IllegalArgumentException("$nin operator requires a list value");
     }

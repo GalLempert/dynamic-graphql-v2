@@ -1,42 +1,66 @@
 package sigma.model;
 
+import io.hypersistence.utils.hibernate.type.json.JsonType;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Index;
+import jakarta.persistence.SequenceGenerator;
+import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
+import org.hibernate.annotations.Type;
 
 import java.util.HashMap;
 import java.util.Map;
 
 /**
- * Concrete class used by the Generic DAL for dynamic, schemaless documents.
+ * Concrete class used by the Generic DAL for dynamic, schemaless entities.
  *
  * Features:
  * - Extends AuditableBaseDocument to ensure metadata fields are included
- * - Uses a Map to hold schemaless, user-defined fields
- * - Collection name is determined dynamically by MongoTemplate at runtime
+ * - Uses a JSONB column to hold schemaless, user-defined fields
+ * - Table name stored in a column to support multiple logical collections in one table
  * - Supports optimistic locking via inherited @Version field
+ * - Uses sequence-based Long IDs instead of UUIDs
  *
  * This class bridges between:
- * - User's dynamic JSON data (stored in dynamicFields Map)
+ * - User's dynamic JSON data (stored in dynamicFields JSONB column)
  * - System-managed audit metadata (inherited from AuditableBaseDocument)
  */
 @Getter
 @Setter
-@Document // No collection name - determined dynamically
+@Entity
+@Table(name = "dynamic_documents", indexes = {
+    @Index(name = "idx_table_name", columnList = "table_name"),
+    @Index(name = "idx_table_name_not_deleted", columnList = "table_name, is_deleted")
+})
 public class DynamicDocument extends AuditableBaseDocument {
 
     /**
-     * MongoDB document identifier
-     * Maps to the MongoDB '_id' field
+     * PostgreSQL sequence-based identifier
+     * Auto-generated using a sequence
      */
     @Id
-    private String id;
+    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "dynamic_doc_seq")
+    @SequenceGenerator(name = "dynamic_doc_seq", sequenceName = "dynamic_documents_id_seq", allocationSize = 1)
+    private Long id;
 
     /**
-     * This Map holds all the dynamic, user-defined fields (the schemaless payload)
+     * Logical table/collection name
+     * Allows multiple logical collections to coexist in the same physical table
+     */
+    @Column(name = "table_name", nullable = false)
+    private String tableName;
+
+    /**
+     * This JSONB column holds all the dynamic, user-defined fields (the schemaless payload)
      * Contains the actual business data submitted by the user
      */
+    @Type(JsonType.class)
+    @Column(name = "data", columnDefinition = "jsonb")
     private Map<String, Object> dynamicFields;
 
     /**
@@ -54,10 +78,19 @@ public class DynamicDocument extends AuditableBaseDocument {
     }
 
     /**
-     * Constructor with id and user data
+     * Constructor with table name and user data
      */
-    public DynamicDocument(String id, Map<String, Object> dynamicFields) {
+    public DynamicDocument(String tableName, Map<String, Object> dynamicFields) {
+        this.tableName = tableName;
+        this.dynamicFields = dynamicFields != null ? new HashMap<>(dynamicFields) : new HashMap<>();
+    }
+
+    /**
+     * Constructor with id, table name and user data
+     */
+    public DynamicDocument(Long id, String tableName, Map<String, Object> dynamicFields) {
         this.id = id;
+        this.tableName = tableName;
         this.dynamicFields = dynamicFields != null ? new HashMap<>(dynamicFields) : new HashMap<>();
     }
 
@@ -90,7 +123,7 @@ public class DynamicDocument extends AuditableBaseDocument {
             result.putAll(dynamicFields);
         }
 
-        // Add system fields
+        // Add system fields - use _id for API compatibility
         if (id != null) result.put("_id", id);
         if (getVersion() != null) result.put("version", getVersion());
         if (getCreatedAt() != null) result.put("createdAt", getCreatedAt());
@@ -115,7 +148,16 @@ public class DynamicDocument extends AuditableBaseDocument {
 
         // Extract system fields
         if (map.containsKey("_id")) {
-            doc.setId(map.get("_id").toString());
+            Object idValue = map.get("_id");
+            if (idValue instanceof Number) {
+                doc.setId(((Number) idValue).longValue());
+            } else if (idValue != null) {
+                try {
+                    doc.setId(Long.parseLong(idValue.toString()));
+                } catch (NumberFormatException e) {
+                    // ID is not a valid number, leave it null
+                }
+            }
         }
         if (map.containsKey("version")) {
             Object version = map.get("version");

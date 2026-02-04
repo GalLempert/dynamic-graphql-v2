@@ -1,11 +1,12 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 import java.util.List;
 
 /**
  * Logical NOR operator: $nor
+ * NOR is equivalent to NOT(OR(...))
  */
 public class NorOperator extends LogicalOperator {
 
@@ -14,10 +15,12 @@ public class NorOperator extends LogicalOperator {
     }
 
     @Override
-    public Criteria applyCriteria(List<Criteria> criteriaList) {
-        if (criteriaList.isEmpty()) {
-            return new Criteria();
+    public SqlPredicate applyPredicates(List<SqlPredicate> predicates) {
+        if (predicates.isEmpty()) {
+            return new SqlPredicate("1=1");
         }
-        return new Criteria().norOperator(criteriaList.toArray(new Criteria[0]));
+        // NOR = NOT(OR(...))
+        SqlPredicate orPredicate = SqlPredicate.or(predicates.toArray(new SqlPredicate[0]));
+        return SqlPredicate.not(orPredicate);
     }
 }

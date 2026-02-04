@@ -2,8 +2,8 @@ package sigma.model.filter.node;
 
 import sigma.model.filter.FilterConfig;
 import sigma.model.filter.FilterOperator;
+import sigma.model.filter.SqlPredicate;
 import sigma.model.filter.operator.LogicalOperator;
-import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,14 +27,14 @@ public class LogicalFilterNode extends FilterNode {
     }
 
     @Override
-    public Criteria toCriteria() {
+    public SqlPredicate toPredicate() {
         LogicalOperator logicalOp = (LogicalOperator) operator.getStrategy();
 
-        List<Criteria> childCriteria = children.stream()
-                .map(FilterNode::toCriteria)
+        List<SqlPredicate> childPredicates = children.stream()
+                .map(FilterNode::toPredicate)
                 .collect(Collectors.toList());
 
-        return logicalOp.applyCriteria(childCriteria);
+        return logicalOp.applyPredicates(childPredicates);
     }
 
     @Override
@@ -45,7 +45,7 @@ public class LogicalFilterNode extends FilterNode {
         if (operator == FilterOperator.NOT && children.size() != 1) {
             errors.add("$not operator must have exactly one condition, got " + children.size());
         } else if (children.isEmpty()) {
-            errors.add(operator.getMongoOperator() + " operator must have at least one condition");
+            errors.add(operator.getOperatorSymbol() + " operator must have at least one condition");
         }
 
         // Validate all children
@@ -56,7 +56,7 @@ public class LogicalFilterNode extends FilterNode {
             // Add context to child errors
             final int childIndex = i;  // Make effectively final for lambda
             childErrors = childErrors.stream()
-                    .map(err -> operator.getMongoOperator() + "[" + childIndex + "]: " + err)
+                    .map(err -> operator.getOperatorSymbol() + "[" + childIndex + "]: " + err)
                     .collect(Collectors.toList());
 
             errors.addAll(childErrors);
@@ -75,6 +75,6 @@ public class LogicalFilterNode extends FilterNode {
 
     @Override
     public String toString() {
-        return "LogicalFilter{" + operator.getMongoOperator() + ": " + children + "}";
+        return "LogicalFilter{" + operator.getOperatorSymbol() + ": " + children + "}";
     }
 }

@@ -1,13 +1,12 @@
 package sigma.service.write.subentity;
 
-import org.springframework.stereotype.Component;
-
 import java.util.UUID;
 
 /**
  * {@link SubEntityIdGenerator} implementation that produces UUID identifiers.
+ * Note: Not annotated with @Component - use SequenceSubEntityIdGenerator as default.
+ * This class is kept for backward compatibility if UUID-based IDs are needed.
  */
-@Component
 public class UuidSubEntityIdGenerator implements SubEntityIdGenerator {
 
     @Override

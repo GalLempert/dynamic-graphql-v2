@@ -3,17 +3,17 @@ package sigma.dto.request;
 import sigma.dto.response.QueryResponse;
 import sigma.dto.response.SequenceResponse;
 import sigma.model.Endpoint;
+import sigma.model.filter.FilterResult;
 import sigma.service.query.QueryBuilder;
 import sigma.service.query.QueryService;
 import sigma.service.validation.RequestValidator;
 import lombok.Getter;
-import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * Request for sequence-based pagination using Change Streams
+ * Request for sequence-based pagination
  */
 @Getter
 public class SequenceQueryRequest implements QueryRequest {
@@ -32,8 +32,8 @@ public class SequenceQueryRequest implements QueryRequest {
     }
 
     @Override
-    public Query buildQuery(QueryBuilder queryBuilder) {
-        return null; // Sequence queries don't use Query objects
+    public FilterResult buildQuery(QueryBuilder queryBuilder) {
+        return null; // Sequence queries don't use FilterResult
     }
 
     @Override
@@ -45,12 +45,12 @@ public class SequenceQueryRequest implements QueryRequest {
     public QueryResponse execute(QueryService service, String collectionName) {
         Map<String, Object> result = service.getRepository()
                 .getNextPageBySequence(collectionName, startSequence, bulkSize);
-        
+
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> data = (List<Map<String, Object>>) result.get("data");
         long nextSequence = (Long) result.get("nextSequence");
         boolean hasMore = (Boolean) result.get("hasMore");
-        
+
         return new SequenceResponse(nextSequence, data, hasMore);
     }
 
