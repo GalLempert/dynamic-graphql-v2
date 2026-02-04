@@ -297,7 +297,7 @@ public class DynamicMongoRepository {
         logger.info("Inserting {} documents into collection: {}", documents.size(), collectionName);
 
         // Insert using MongoTemplate - audit fields automatically populated
-        List<DynamicDocument> savedDocs = (List<DynamicDocument>) mongoTemplate.insert(documents, collectionName);
+        List<DynamicDocument> savedDocs = new ArrayList<>(mongoTemplate.insert(documents, collectionName));
 
         List<String> insertedIds = savedDocs.stream()
                 .map(DynamicDocument::getId)

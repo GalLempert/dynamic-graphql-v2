@@ -10,7 +10,6 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -45,11 +44,12 @@ public class SchemaManager implements EnumRegistryListener {
 
     public SchemaManager(
             ZooKeeper zooKeeper,
-            @Value("${zookeeper.base-path}") String basePath,
             ObjectMapper objectMapper,
             EnumRegistry enumRegistry) {
         this.zooKeeper = zooKeeper;
-        this.schemasBasePath = basePath + "/schemas";
+        String env = System.getenv("ENV");
+        String service = System.getenv("SERVICE");
+        this.schemasBasePath = "/" + env + "/" + service + "/schemas";
         this.objectMapper = objectMapper;
         this.schemaCache = new ConcurrentHashMap<>();
         this.enumSchemaAugmentor = new EnumSchemaAugmentor(enumRegistry);

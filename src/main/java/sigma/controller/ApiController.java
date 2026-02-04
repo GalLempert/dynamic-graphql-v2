@@ -46,7 +46,7 @@ public class ApiController {
      * Handles all requests under the API prefix
      * Routes to appropriate controller based on endpoint configuration
      */
-    @RequestMapping(value = "${apiPrefix:#{'/api'}}/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.DELETE})
+    @RequestMapping(value = "${apiPrefix:#{'/api'}}/**", method = {RequestMethod.GET, RequestMethod.POST, RequestMethod.PUT, RequestMethod.PATCH, RequestMethod.DELETE})
     public ResponseEntity<?> handleRequest(@RequestBody(required = false) String body,
                                           HttpServletRequest request) {
         String fullPath = request.getRequestURI();
