@@ -3,12 +3,12 @@ package sigma.model.filter.operator;
 import sigma.model.filter.SqlPredicate;
 
 /**
- * Not equal operator: $ne
+ * Not equal operator: ne
  */
 public class NotEqualOperator extends ComparisonOperator {
 
     public NotEqualOperator() {
-        super("$ne");
+        super("ne");
     }
 
     @Override

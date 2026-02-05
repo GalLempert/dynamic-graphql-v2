@@ -11,7 +11,7 @@ import java.util.Map;
  * Represents a filter request from the client
  * Structure:
  * {
- *   "filter": { "$and": [...], "$or": [...], "fieldName": "value", ... },
+ *   "filter": { "and": [...], "or": [...], "fieldName": "value", ... },
  *   "options": { "sort": {...}, "limit": 50, "skip": 0, "projection": {...} }
  * }
  */

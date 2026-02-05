@@ -9,21 +9,21 @@ class SubEntityCommandFactory {
 
     SubEntityCommand createForCreate(String fieldName, Map<?, ?> payload) {
         SubEntityPayload parsed = SubEntityPayload.forCreate(fieldName, payload);
-        return new CreateSubEntityCommand(parsed.myId(), parsed.attributes());
+        return new CreateSubEntityCommand(parsed.id(), parsed.attributes());
     }
 
     SubEntityCommand createForModify(String fieldName, Map<?, ?> payload) {
         SubEntityPayload parsed = SubEntityPayload.forModify(fieldName, payload);
         if (parsed.deleted()) {
-            if (parsed.myId() == null || parsed.myId().isBlank()) {
+            if (parsed.id() == null) {
                 throw new IllegalArgumentException(
-                        "Cannot delete sub-entity without myId for field '" + fieldName + "'");
+                        "Cannot delete sub-entity without id for field '" + fieldName + "'");
             }
-            return new DeleteSubEntityCommand(parsed.myId());
+            return new DeleteSubEntityCommand(parsed.id());
         }
-        if (parsed.myId() == null || parsed.myId().isBlank()) {
+        if (parsed.id() == null) {
             return new CreateSubEntityCommand(null, parsed.attributes());
         }
-        return new UpdateSubEntityCommand(parsed.myId(), parsed.attributes());
+        return new UpdateSubEntityCommand(parsed.id(), parsed.attributes());
     }
 }

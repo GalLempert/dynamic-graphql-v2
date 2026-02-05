@@ -3,12 +3,12 @@ package sigma.model.filter.operator;
 import sigma.model.filter.SqlPredicate;
 
 /**
- * Less than or equal operator: $lte
+ * Less than or equal operator: lte
  */
 public class LessThanEqualOperator extends ComparisonOperator {
 
     public LessThanEqualOperator() {
-        super("$lte");
+        super("lte");
     }
 
     @Override

@@ -392,7 +392,7 @@ public class RequestParser {
         request.getParameterMap().forEach((key, values) -> {
             if (!isSpecialParameter(key) && values.length > 0) {
                 // Simple equals filter for query params
-                filter.put(key, Map.of("$eq", values[0]));
+                filter.put(key, Map.of("eq", values[0]));
             }
         });
 

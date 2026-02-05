@@ -5,13 +5,13 @@ import sigma.model.filter.SqlPredicate;
 import java.util.List;
 
 /**
- * Logical NOT operator: $not
- * Note: $not works differently - it negates a single expression
+ * Logical NOT operator: not
+ * Note: not works differently - it negates a single expression
  */
 public class NotOperator extends LogicalOperator {
 
     public NotOperator() {
-        super("$not");
+        super("not");
     }
 
     @Override
@@ -20,7 +20,7 @@ public class NotOperator extends LogicalOperator {
             return new SqlPredicate("1=1");
         }
         if (predicates.size() > 1) {
-            throw new IllegalArgumentException("$not operator only accepts a single condition");
+            throw new IllegalArgumentException("not operator only accepts a single condition");
         }
         return SqlPredicate.not(predicates.get(0));
     }

@@ -27,13 +27,12 @@ public interface OperatorStrategy {
     boolean isValidValue(Object value);
 
     /**
-     * Returns the operator symbol (e.g., "$eq", "$gt")
-     * Note: These match the MongoDB-style operators for API compatibility
+     * Returns the operator symbol (e.g., "eq", "gt")
      */
     String getOperator();
 
     /**
-     * Returns true if this is a logical operator ($and, $or, $not, $nor)
+     * Returns true if this is a logical operator (and, or, not, nor)
      */
     boolean isLogical();
 }

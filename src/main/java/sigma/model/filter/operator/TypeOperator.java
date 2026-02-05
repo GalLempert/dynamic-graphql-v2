@@ -3,13 +3,13 @@ package sigma.model.filter.operator;
 import sigma.model.filter.SqlPredicate;
 
 /**
- * Type operator: $type
+ * Type operator: type
  * In PostgreSQL, uses jsonb_typeof to check the type of a JSONB field
  */
 public class TypeOperator extends ComparisonOperator {
 
     public TypeOperator() {
-        super("$type");
+        super("type");
     }
 
     @Override

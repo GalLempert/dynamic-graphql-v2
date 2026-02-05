@@ -11,7 +11,7 @@ import java.util.stream.Collectors;
 
 /**
  * Represents a logical operator node in the filter tree
- * Example: { "$and": [...] }
+ * Example: { "and": [...] }
  */
 public class LogicalFilterNode extends FilterNode {
 

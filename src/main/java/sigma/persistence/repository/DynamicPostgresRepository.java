@@ -295,7 +295,7 @@ public class DynamicPostgresRepository {
         for (DynamicDocument doc : documents) {
             Map<String, Object> documentData = new HashMap<>();
             documentData.put("operationType", doc.isDeleted() ? "delete" : "update");
-            documentData.put("documentKey", Map.of("_id", doc.getId()));
+            documentData.put("documentKey", Map.of("id", doc.getId()));
             documentData.put("fullDocument", doc.toMap());
             documentData.put("sequenceNumber", doc.getSequenceNumber());
             results.add(documentData);

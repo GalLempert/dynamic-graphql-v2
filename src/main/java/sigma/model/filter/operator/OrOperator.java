@@ -5,12 +5,12 @@ import sigma.model.filter.SqlPredicate;
 import java.util.List;
 
 /**
- * Logical OR operator: $or
+ * Logical OR operator: or
  */
 public class OrOperator extends LogicalOperator {
 
     public OrOperator() {
-        super("$or");
+        super("or");
     }
 
     @Override

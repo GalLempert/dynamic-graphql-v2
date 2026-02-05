@@ -3,12 +3,12 @@ package sigma.model.filter.operator;
 import sigma.model.filter.SqlPredicate;
 
 /**
- * Equality operator: $eq
+ * Equality operator: eq
  */
 public class EqualOperator extends ComparisonOperator {
 
     public EqualOperator() {
-        super("$eq");
+        super("eq");
     }
 
     @Override

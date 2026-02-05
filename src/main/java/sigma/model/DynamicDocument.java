@@ -116,8 +116,8 @@ public class DynamicDocument extends AuditableBaseDocument {
             result.putAll(dynamicFields);
         }
 
-        // Add system fields - use _id for API compatibility
-        if (id != null) result.put("_id", id);
+        // Add system fields
+        if (id != null) result.put("id", id);
         if (getVersion() != null) result.put("version", getVersion());
         if (getCreatedAt() != null) result.put("createdAt", getCreatedAt());
         if (getLastModifiedAt() != null) result.put("lastModifiedAt", getLastModifiedAt());
@@ -140,8 +140,8 @@ public class DynamicDocument extends AuditableBaseDocument {
         DynamicDocument doc = new DynamicDocument();
 
         // Extract system fields
-        if (map.containsKey("_id")) {
-            Object idValue = map.get("_id");
+        if (map.containsKey("id")) {
+            Object idValue = map.get("id");
             if (idValue instanceof Number) {
                 doc.setId(((Number) idValue).longValue());
             } else if (idValue != null) {
@@ -159,7 +159,7 @@ public class DynamicDocument extends AuditableBaseDocument {
 
         // Copy dynamic fields (exclude system fields)
         Map<String, Object> dynamicFields = new HashMap<>(map);
-        dynamicFields.remove("_id");
+        dynamicFields.remove("id");
         dynamicFields.remove("version");
         dynamicFields.remove("createdAt");
         dynamicFields.remove("lastModifiedAt");

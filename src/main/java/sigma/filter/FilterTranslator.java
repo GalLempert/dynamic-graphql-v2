@@ -133,11 +133,11 @@ public class FilterTranslator {
 
     /**
      * Builds an ORDER BY fragment for a single field.
-     * For _id, uses the id column directly.
+     * For id, uses the id column directly.
      * For other fields, uses JSONB path expression.
      */
     private String buildOrderByForField(String field, String direction) {
-        if ("_id".equals(field)) {
+        if ("id".equals(field)) {
             return "d.id " + direction;
         }
         // For JSONB fields, we sort by the text value

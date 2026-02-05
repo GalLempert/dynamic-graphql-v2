@@ -166,8 +166,8 @@ public class EndpointRegistry {
     /**
      * Loads filter configuration for an endpoint from Zookeeper
      * Structure: /{ENV}/{SERVICE}/endpoints/{endpointName}/{filterType}/{fieldName}
-     * Each field contains comma-separated operators: $eq,$gt,$lt
-     * 
+     * Each field contains comma-separated operators: eq,gt,lt
+     *
      * @param endpointName Name of the endpoint
      * @param endpointsBasePath Base path for endpoints in ZooKeeper
      * @param filterType "readFilter" or "writeFilter"

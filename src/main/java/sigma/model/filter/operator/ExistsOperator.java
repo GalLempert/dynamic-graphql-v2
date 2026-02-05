@@ -3,12 +3,12 @@ package sigma.model.filter.operator;
 import sigma.model.filter.SqlPredicate;
 
 /**
- * Exists operator: $exists
+ * Exists operator: exists
  */
 public class ExistsOperator extends ComparisonOperator {
 
     public ExistsOperator() {
-        super("$exists");
+        super("exists");
     }
 
     @Override

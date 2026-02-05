@@ -20,7 +20,7 @@ public class SequenceSubEntityIdGenerator implements SubEntityIdGenerator {
     }
 
     @Override
-    public String generate() {
-        return String.valueOf(sequence.incrementAndGet());
+    public Long generate() {
+        return sequence.incrementAndGet();
     }
 }

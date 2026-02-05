@@ -111,8 +111,8 @@ public class SqlPredicate {
      * data->>'fieldName' = :param
      */
     public static SqlPredicate jsonbEquals(String fieldName, Object value) {
-        // Handle _id field specially - it's a direct column, not in JSONB
-        if ("_id".equals(fieldName)) {
+        // Handle id field specially - it's a direct column, not in JSONB
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("id");
             return new SqlPredicate("d.id = :" + paramName, paramName, value);
         }
@@ -126,7 +126,7 @@ public class SqlPredicate {
      * Creates a predicate for JSONB field not equals
      */
     public static SqlPredicate jsonbNotEquals(String fieldName, Object value) {
-        if ("_id".equals(fieldName)) {
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("id");
             return new SqlPredicate("d.id != :" + paramName, paramName, value);
         }
@@ -141,7 +141,7 @@ public class SqlPredicate {
      * Creates a predicate for numeric JSONB comparison (greater than)
      */
     public static SqlPredicate jsonbGreaterThan(String fieldName, Object value) {
-        if ("_id".equals(fieldName)) {
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("id");
             return new SqlPredicate("d.id > :" + paramName, paramName, toLong(value));
         }
@@ -157,7 +157,7 @@ public class SqlPredicate {
      * Creates a predicate for numeric JSONB comparison (greater than or equal)
      */
     public static SqlPredicate jsonbGreaterThanOrEqual(String fieldName, Object value) {
-        if ("_id".equals(fieldName)) {
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("id");
             return new SqlPredicate("d.id >= :" + paramName, paramName, toLong(value));
         }
@@ -172,7 +172,7 @@ public class SqlPredicate {
      * Creates a predicate for numeric JSONB comparison (less than)
      */
     public static SqlPredicate jsonbLessThan(String fieldName, Object value) {
-        if ("_id".equals(fieldName)) {
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("id");
             return new SqlPredicate("d.id < :" + paramName, paramName, toLong(value));
         }
@@ -187,7 +187,7 @@ public class SqlPredicate {
      * Creates a predicate for numeric JSONB comparison (less than or equal)
      */
     public static SqlPredicate jsonbLessThanOrEqual(String fieldName, Object value) {
-        if ("_id".equals(fieldName)) {
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("id");
             return new SqlPredicate("d.id <= :" + paramName, paramName, toLong(value));
         }
@@ -202,7 +202,7 @@ public class SqlPredicate {
      * Creates a predicate for JSONB IN clause
      */
     public static SqlPredicate jsonbIn(String fieldName, java.util.List<?> values) {
-        if ("_id".equals(fieldName)) {
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("ids");
             return new SqlPredicate("d.id IN (:" + paramName + ")", paramName, values);
         }
@@ -220,7 +220,7 @@ public class SqlPredicate {
      * Creates a predicate for JSONB NOT IN clause
      */
     public static SqlPredicate jsonbNotIn(String fieldName, java.util.List<?> values) {
-        if ("_id".equals(fieldName)) {
+        if ("id".equals(fieldName)) {
             String paramName = generateParamName("ids");
             return new SqlPredicate("d.id NOT IN (:" + paramName + ")", paramName, values);
         }

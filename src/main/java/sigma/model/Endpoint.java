@@ -75,7 +75,7 @@ public class Endpoint {
 
     /**
      * Gets the filter configuration for READ operations
-     * Read filters can be more permissive (allowing complex queries with $or, $in, etc.)
+     * Read filters can be more permissive (allowing complex queries with or, in, etc.)
      */
     public FilterConfig getReadFilterConfig() {
         return readFilterConfig;
@@ -84,7 +84,7 @@ public class Endpoint {
     /**
      * Gets the filter configuration for WRITE operations
      * Write filters should be more restrictive to prevent mass updates/deletes
-     * Typically limited to _id and unique identifier fields
+     * Typically limited to id and unique identifier fields
      */
     public FilterConfig getWriteFilterConfig() {
         return writeFilterConfig;

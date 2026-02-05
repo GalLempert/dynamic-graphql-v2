@@ -5,14 +5,14 @@ package sigma.service.write.subentity;
  */
 class DeleteSubEntityCommand implements SubEntityCommand {
 
-    private final String myId;
+    private final Long id;
 
-    DeleteSubEntityCommand(String myId) {
-        this.myId = myId;
+    DeleteSubEntityCommand(Long id) {
+        this.id = id;
     }
 
     @Override
     public void apply(SubEntityCollection collection) {
-        collection.delete(myId);
+        collection.delete(id);
     }
 }

@@ -52,8 +52,7 @@ public enum FilterOperator {
     }
 
     /**
-     * Returns the operator symbol (e.g., "$eq", "$gt")
-     * These match the MongoDB-style operators for API compatibility
+     * Returns the operator symbol (e.g., "eq", "gt")
      */
     public String getOperatorSymbol() {
         return strategy.getOperator();

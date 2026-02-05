@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 /**
  * Represents a composite filter with multiple field conditions
  * This is used when a filter map contains multiple keys (implicitly ANDed)
- * Example: { "category": "electronics", "price": { "$gt": 100 } }
+ * Example: { "category": "electronics", "price": { "gt": 100 } }
  */
 public class CompositeFilterNode extends FilterNode {
 

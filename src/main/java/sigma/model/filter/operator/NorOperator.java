@@ -5,13 +5,13 @@ import sigma.model.filter.SqlPredicate;
 import java.util.List;
 
 /**
- * Logical NOR operator: $nor
+ * Logical NOR operator: nor
  * NOR is equivalent to NOT(OR(...))
  */
 public class NorOperator extends LogicalOperator {
 
     public NorOperator() {
-        super("$nor");
+        super("nor");
     }
 
     @Override

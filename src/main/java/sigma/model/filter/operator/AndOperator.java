@@ -5,12 +5,12 @@ import sigma.model.filter.SqlPredicate;
 import java.util.List;
 
 /**
- * Logical AND operator: $and
+ * Logical AND operator: and
  */
 public class AndOperator extends LogicalOperator {
 
     public AndOperator() {
-        super("$and");
+        super("and");
     }
 
     @Override

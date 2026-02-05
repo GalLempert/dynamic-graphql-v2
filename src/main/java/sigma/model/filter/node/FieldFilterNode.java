@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * Represents a field filter node in the filter tree
- * Example: { "price": { "$gte": 100 } }
+ * Example: { "price": { "gte": 100 } }
  */
 public class FieldFilterNode extends FilterNode {
 
@@ -28,7 +28,7 @@ public class FieldFilterNode extends FilterNode {
      */
     public FieldFilterNode(String fieldName, Object value) {
         this.fieldName = fieldName;
-        this.operators = Map.of("$eq", value);
+        this.operators = Map.of("eq", value);
     }
 
     @Override
@@ -76,11 +76,6 @@ public class FieldFilterNode extends FilterNode {
         for (Map.Entry<String, Object> entry : operators.entrySet()) {
             String operatorSymbol = entry.getKey();
             Object value = entry.getValue();
-
-            if (!operatorSymbol.startsWith("$")) {
-                errors.add("Expected operator (starting with $) but got '" + operatorSymbol + "' for field '" + fieldName + "'");
-                continue;
-            }
 
             try {
                 FilterOperator operator = FilterOperator.fromString(operatorSymbol);

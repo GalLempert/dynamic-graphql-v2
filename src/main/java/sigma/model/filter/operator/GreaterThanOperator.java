@@ -3,12 +3,12 @@ package sigma.model.filter.operator;
 import sigma.model.filter.SqlPredicate;
 
 /**
- * Greater than operator: $gt
+ * Greater than operator: gt
  */
 public class GreaterThanOperator extends ComparisonOperator {
 
     public GreaterThanOperator() {
-        super("$gt");
+        super("gt");
     }
 
     @Override
