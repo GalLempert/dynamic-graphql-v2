@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 import java.util.List;
 
@@ -16,7 +17,7 @@ public class InOperator extends ComparisonOperator {
     @Override
     public SqlPredicate apply(String fieldName, Object value) {
         if (value instanceof List) {
-            return SqlPredicate.jsonbIn(fieldName, (List<?>) value);
+            return SqlPredicateFactory.jsonIn(fieldName, (List<?>) value);
         }
         throw new IllegalArgumentException("in operator requires a list value");
     }

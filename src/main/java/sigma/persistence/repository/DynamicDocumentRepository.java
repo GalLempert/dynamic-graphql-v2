@@ -3,6 +3,7 @@ package sigma.persistence.repository;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sigma.model.DynamicDocument;
+import sigma.persistence.dialect.DatabaseDialect;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.RowMapper;
@@ -22,29 +23,34 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 /**
- * Dynamic PostgreSQL repository for querying and writing to the dynamic_documents table
- * Uses JDBC with JSONB for storing schemaless data with PostgreSQL-specific operators
+ * Dynamic document repository supporting multiple database types.
+ * Uses JDBC with JSON storage for schemaless data.
+ * Supports PostgreSQL, Oracle, and H2 via dialect abstraction.
  *
  * Supports:
- * - Read operations (queries with JSONB filtering, pagination)
+ * - Read operations (queries with JSON filtering, pagination)
  * - Write operations (insert, update, delete, upsert)
  */
 @Repository
-public class DynamicPostgresRepository {
+public class DynamicDocumentRepository {
 
-    private static final Logger logger = LoggerFactory.getLogger(DynamicPostgresRepository.class);
+    private static final Logger logger = LoggerFactory.getLogger(DynamicDocumentRepository.class);
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final DynamicDocumentJpaRepository crudRepository;
     private final ObjectMapper objectMapper;
+    private final DatabaseDialect dialect;
 
-    public DynamicPostgresRepository(
+    public DynamicDocumentRepository(
             NamedParameterJdbcTemplate jdbcTemplate,
             DynamicDocumentJpaRepository crudRepository,
-            ObjectMapper objectMapper) {
+            ObjectMapper objectMapper,
+            DatabaseDialect dialect) {
         this.jdbcTemplate = jdbcTemplate;
         this.crudRepository = crudRepository;
         this.objectMapper = objectMapper;
+        this.dialect = dialect;
+        logger.info("Initialized DynamicDocumentRepository with dialect: {}", dialect.getType());
     }
 
     private final RowMapper<DynamicDocument> documentRowMapper = (rs, rowNum) -> {
@@ -52,7 +58,14 @@ public class DynamicPostgresRepository {
         doc.setId(rs.getLong("id"));
         doc.setTableName(rs.getString("table_name"));
         doc.setVersion(rs.getLong("version"));
-        doc.setDeleted(rs.getBoolean("is_deleted"));
+
+        // Handle boolean - Oracle uses NUMBER(1)
+        if (dialect.requiresBooleanConversion()) {
+            doc.setDeleted(rs.getInt("is_deleted") == 1);
+        } else {
+            doc.setDeleted(rs.getBoolean("is_deleted"));
+        }
+
         doc.setLatestRequestId(rs.getString("latest_request_id"));
         doc.setCreatedBy(rs.getString("created_by"));
         doc.setLastModifiedBy(rs.getString("last_modified_by"));
@@ -67,7 +80,7 @@ public class DynamicPostgresRepository {
             doc.setLastModifiedAt(lastModifiedAt.toInstant());
         }
 
-        // Parse JSONB data column
+        // Parse JSON data column
         String dataJson = rs.getString("data");
         if (dataJson != null) {
             try {
@@ -75,7 +88,7 @@ public class DynamicPostgresRepository {
                 Map<String, Object> data = objectMapper.readValue(dataJson, Map.class);
                 doc.setDynamicFields(data);
             } catch (JsonProcessingException e) {
-                logger.error("Error parsing JSONB data for document {}", doc.getId(), e);
+                logger.error("Error parsing JSON data for document {}", doc.getId(), e);
                 doc.setDynamicFields(new HashMap<>());
             }
         }
@@ -98,14 +111,6 @@ public class DynamicPostgresRepository {
     /**
      * Finds documents using a complex query with filters, sorting, pagination, and projection
      * Used by FilteredQueryRequest
-     *
-     * @param tableName The logical table name
-     * @param whereClause The WHERE clause for JSONB filtering (without "WHERE")
-     * @param orderByClause The ORDER BY clause (without "ORDER BY")
-     * @param limit Max results
-     * @param offset Skip results
-     * @param params Named parameters for the query
-     * @return List of document maps
      */
     public List<Map<String, Object>> findWithQuery(
             String tableName,
@@ -117,7 +122,8 @@ public class DynamicPostgresRepository {
 
         logger.debug("Executing query on table {}: WHERE {} ORDER BY {}", tableName, whereClause, orderByClause);
 
-        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
+        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents d WHERE d.table_name = :tableName AND ");
+        sql.append(buildDeletedCheck(false));
 
         if (whereClause != null && !whereClause.isEmpty()) {
             sql.append(" AND ").append(whereClause);
@@ -127,13 +133,7 @@ public class DynamicPostgresRepository {
             sql.append(" ORDER BY ").append(orderByClause);
         }
 
-        if (limit != null && limit > 0) {
-            sql.append(" LIMIT ").append(limit);
-        }
-
-        if (offset != null && offset > 0) {
-            sql.append(" OFFSET ").append(offset);
-        }
+        sql.append(dialect.paginationClause(limit, offset));
 
         MapSqlParameterSource paramSource = new MapSqlParameterSource();
         paramSource.addValue("tableName", tableName);
@@ -148,12 +148,10 @@ public class DynamicPostgresRepository {
     }
 
     /**
-     * Finds documents without applying the logical deletion filter. Intended for
-     * operational flows that must inspect soft-deleted records (e.g. response
-     * payloads after delete operations).
+     * Finds documents without applying the logical deletion filter.
      */
     public List<Map<String, Object>> findRaw(String tableName, String whereClause, Map<String, Object> params) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName");
+        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents d WHERE d.table_name = :tableName");
 
         if (whereClause != null && !whereClause.isEmpty()) {
             sql.append(" AND ").append(whereClause);
@@ -175,10 +173,6 @@ public class DynamicPostgresRepository {
 
     /**
      * Loads documents by their identifiers.
-     *
-     * @param tableName The table to query
-     * @param ids Identifiers to load
-     * @return Matching documents as maps
      */
     public List<Map<String, Object>> findByIds(String tableName, List<Long> ids) {
         if (ids == null || ids.isEmpty()) {
@@ -194,16 +188,7 @@ public class DynamicPostgresRepository {
 
     /**
      * Finds nested documents by treating the specified field as a collection on its own.
-     * Uses JSONB array expansion via jsonb_array_elements
-     *
-     * @param tableName The table hosting the nested documents
-     * @param whereClause The WHERE clause for filtering
-     * @param fatherDocumentPath Path of the nested document array inside the parent document
-     * @param params Query parameters
-     * @param orderByClause Order by clause
-     * @param limit Limit
-     * @param offset Offset
-     * @return List of nested documents matching the query
+     * Uses dialect-specific JSON array expansion.
      */
     @SuppressWarnings("unchecked")
     public List<Map<String, Object>> findNestedDocuments(
@@ -218,14 +203,13 @@ public class DynamicPostgresRepository {
         logger.debug("Executing nested query on table {} -> field {} with whereClause {}",
                 tableName, fatherDocumentPath, whereClause);
 
-        // For nested documents, we need to use native SQL with jsonb_array_elements
         StringBuilder sql = new StringBuilder();
         sql.append("SELECT nested.value as nested_doc FROM dynamic_documents d, ");
-        sql.append("jsonb_array_elements(d.data->'").append(fatherDocumentPath).append("') AS nested(value) ");
-        sql.append("WHERE d.table_name = :tableName AND d.is_deleted = false ");
+        sql.append(dialect.jsonArrayExpand("d.data", fatherDocumentPath, "nested"));
+        sql.append(" WHERE d.table_name = :tableName AND ");
+        sql.append(buildDeletedCheck(false));
 
         if (whereClause != null && !whereClause.isEmpty()) {
-            // Adjust whereClause for nested document context
             sql.append(" AND ").append(whereClause);
         }
 
@@ -233,13 +217,7 @@ public class DynamicPostgresRepository {
             sql.append(" ORDER BY ").append(orderByClause);
         }
 
-        if (limit != null && limit > 0) {
-            sql.append(" LIMIT ").append(limit);
-        }
-
-        if (offset != null && offset > 0) {
-            sql.append(" OFFSET ").append(offset);
-        }
+        sql.append(dialect.paginationClause(limit, offset));
 
         MapSqlParameterSource paramSource = new MapSqlParameterSource();
         paramSource.addValue("tableName", tableName);
@@ -266,28 +244,21 @@ public class DynamicPostgresRepository {
 
     /**
      * Gets the next page of changes using sequence-based pagination.
-     * Uses the sequence_number column which is automatically updated by a PostgreSQL trigger
-     * on every insert/update operation.
-     *
-     * @param tableName The table name
-     * @param startSequence The sequence number to start from (exclusive)
-     * @param batchSize Maximum number of documents to return
-     * @return Map containing "data" (list of change documents), "nextSequence", and "hasMore"
      */
     public Map<String, Object> getNextPageBySequence(String tableName, long startSequence, int batchSize) {
         logger.info("Getting next page for table: {}, startSequence: {}, batchSize: {}",
                 tableName, startSequence, batchSize);
 
-        // Query for documents with sequence_number greater than startSequence
-        String sql = "SELECT * FROM dynamic_documents WHERE table_name = :tableName " +
-                "AND sequence_number > :startSequence ORDER BY sequence_number ASC LIMIT :batchSize";
+        StringBuilder sql = new StringBuilder();
+        sql.append("SELECT * FROM dynamic_documents d WHERE d.table_name = :tableName ");
+        sql.append("AND d.sequence_number > :startSequence ORDER BY d.sequence_number ASC ");
+        sql.append(dialect.limitClause(batchSize));
 
         MapSqlParameterSource paramSource = new MapSqlParameterSource();
         paramSource.addValue("tableName", tableName);
         paramSource.addValue("startSequence", startSequence);
-        paramSource.addValue("batchSize", batchSize);
 
-        List<DynamicDocument> documents = jdbcTemplate.query(sql, paramSource, documentRowMapper);
+        List<DynamicDocument> documents = jdbcTemplate.query(sql.toString(), paramSource, documentRowMapper);
 
         List<Map<String, Object>> results = new ArrayList<>();
         long nextSequence = startSequence;
@@ -300,7 +271,6 @@ public class DynamicPostgresRepository {
             documentData.put("sequenceNumber", doc.getSequenceNumber());
             results.add(documentData);
 
-            // Track the highest sequence number seen
             if (doc.getSequenceNumber() != null && doc.getSequenceNumber() > nextSequence) {
                 nextSequence = doc.getSequenceNumber();
             }
@@ -318,11 +288,6 @@ public class DynamicPostgresRepository {
 
     /**
      * Inserts a single document into the table
-     * Uses native SQL for full control over JSONB insertion
-     *
-     * @param tableName The table name
-     * @param document The DynamicDocument to insert
-     * @return The ID of the inserted document
      */
     @Transactional
     public Long insertOne(String tableName, DynamicDocument document) {
@@ -338,20 +303,21 @@ public class DynamicPostgresRepository {
             document.setVersion(0L);
         }
 
-        String sql = """
-            INSERT INTO dynamic_documents (table_name, data, version, is_deleted, latest_request_id,
-                created_by, last_modified_by, created_at, last_modified_at)
-            VALUES (:tableName, :data::jsonb, :version, :isDeleted, :latestRequestId,
-                :createdBy, :lastModifiedBy, :createdAt, :lastModifiedAt)
-            RETURNING id
-            """;
-
+        String sql = dialect.getInsertSql();
         MapSqlParameterSource params = buildInsertParams(document);
 
-        KeyHolder keyHolder = new GeneratedKeyHolder();
-        jdbcTemplate.update(sql, params, keyHolder, new String[]{"id"});
+        Long insertedId;
+        if (dialect.supportsReturningClause()) {
+            KeyHolder keyHolder = new GeneratedKeyHolder();
+            jdbcTemplate.update(sql, params, keyHolder, new String[]{"id"});
+            insertedId = keyHolder.getKey() != null ? keyHolder.getKey().longValue() : null;
+        } else {
+            jdbcTemplate.update(sql, params);
+            // Get the last inserted ID using dialect-specific SQL
+            insertedId = jdbcTemplate.queryForObject(dialect.getLastInsertIdSql(),
+                new MapSqlParameterSource(), Long.class);
+        }
 
-        Long insertedId = keyHolder.getKey() != null ? keyHolder.getKey().longValue() : null;
         document.setId(insertedId);
 
         logger.info("Successfully inserted document with id: {} (version: {})", insertedId, document.getVersion());
@@ -360,10 +326,6 @@ public class DynamicPostgresRepository {
 
     /**
      * Inserts multiple documents into the table (bulk insert)
-     *
-     * @param tableName The table name
-     * @param documents The DynamicDocuments to insert
-     * @return List of IDs of inserted documents
      */
     @Transactional
     public List<Long> insertMany(String tableName, List<DynamicDocument> documents) {
@@ -381,26 +343,19 @@ public class DynamicPostgresRepository {
 
     /**
      * Updates document(s) matching the query
-     *
-     * @param tableName The table name
-     * @param whereClause The WHERE clause to find documents
-     * @param updates The updates to apply (field name -> value)
-     * @param params Query parameters
-     * @param updateMultiple Whether to update all matching documents or just the first
-     * @return Number of updated documents
      */
     @Transactional
     public int update(String tableName, String whereClause, Map<String, Object> updates,
                       Map<String, Object> params, boolean updateMultiple) {
         logger.info("Updating documents in table: {} (multiple: {})", tableName, updateMultiple);
 
-        // First, find matching documents
-        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
+        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents d WHERE d.table_name = :tableName AND ");
+        selectSql.append(buildDeletedCheck(false));
         if (whereClause != null && !whereClause.isEmpty()) {
             selectSql.append(" AND ").append(whereClause);
         }
         if (!updateMultiple) {
-            selectSql.append(" LIMIT 1");
+            selectSql.append(" ").append(dialect.limitClause(1));
         }
 
         MapSqlParameterSource selectParams = new MapSqlParameterSource();
@@ -411,7 +366,6 @@ public class DynamicPostgresRepository {
 
         List<DynamicDocument> documents = jdbcTemplate.query(selectSql.toString(), selectParams, documentRowMapper);
 
-        // Apply updates to each document
         Instant now = Instant.now();
         for (DynamicDocument doc : documents) {
             Map<String, Object> dynamicFields = doc.getDynamicFields();
@@ -431,19 +385,13 @@ public class DynamicPostgresRepository {
     }
 
     private void updateDocument(DynamicDocument document) {
-        String sql = """
-            UPDATE dynamic_documents
-            SET data = :data::jsonb, version = :version, is_deleted = :isDeleted,
-                latest_request_id = :latestRequestId, last_modified_by = :lastModifiedBy,
-                last_modified_at = :lastModifiedAt
-            WHERE id = :id
-            """;
+        String sql = dialect.getUpdateSql();
 
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("id", document.getId());
         params.addValue("data", toJsonString(document.getDynamicFields()));
         params.addValue("version", document.getVersion());
-        params.addValue("isDeleted", document.isDeleted());
+        params.addValue("isDeleted", dialect.convertBoolean(document.isDeleted()));
         params.addValue("latestRequestId", document.getLatestRequestId());
         params.addValue("lastModifiedBy", document.getLastModifiedBy());
         params.addValue("lastModifiedAt", Timestamp.from(document.getLastModifiedAt()));
@@ -453,24 +401,18 @@ public class DynamicPostgresRepository {
 
     /**
      * Upserts a document (update if exists, insert if not)
-     *
-     * @param tableName The table name
-     * @param whereClause The WHERE clause to find the document
-     * @param document The document data to upsert
-     * @param params Query parameters
-     * @return Map with "upsertedId" (if inserted) or "matchedCount"/"modifiedCount"
      */
     @Transactional
     public Map<String, Object> upsert(String tableName, String whereClause,
                                        Map<String, Object> document, Map<String, Object> params) {
         logger.info("Upserting document in table: {}", tableName);
 
-        // Try to find existing document
-        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
+        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents d WHERE d.table_name = :tableName AND ");
+        selectSql.append(buildDeletedCheck(false));
         if (whereClause != null && !whereClause.isEmpty()) {
             selectSql.append(" AND ").append(whereClause);
         }
-        selectSql.append(" LIMIT 1");
+        selectSql.append(" ").append(dialect.limitClause(1));
 
         MapSqlParameterSource selectParams = new MapSqlParameterSource();
         selectParams.addValue("tableName", tableName);
@@ -483,13 +425,11 @@ public class DynamicPostgresRepository {
         Map<String, Object> result = new HashMap<>();
 
         if (existing.isEmpty()) {
-            // Insert new document
             DynamicDocument newDoc = new DynamicDocument(tableName, document);
             Long insertedId = insertOne(tableName, newDoc);
             result.put("upsertedId", insertedId);
             logger.info("Upserted new document with id: {}", insertedId);
         } else {
-            // Update existing document
             DynamicDocument doc = existing.get(0);
             Map<String, Object> dynamicFields = doc.getDynamicFields();
             if (dynamicFields == null) {
@@ -512,26 +452,19 @@ public class DynamicPostgresRepository {
 
     /**
      * Soft deletes document(s) matching the query
-     *
-     * @param tableName The table name
-     * @param whereClause The WHERE clause to find documents to delete
-     * @param params Query parameters
-     * @param deleteMultiple Whether to delete all matching documents or just the first
-     * @param requestId The request ID to record
-     * @return Number of deleted documents
      */
     @Transactional
     public int delete(String tableName, String whereClause, Map<String, Object> params,
                       boolean deleteMultiple, String requestId) {
         logger.info("Deleting documents from table: {} (multiple: {})", tableName, deleteMultiple);
 
-        // Find matching documents
-        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
+        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents d WHERE d.table_name = :tableName AND ");
+        selectSql.append(buildDeletedCheck(false));
         if (whereClause != null && !whereClause.isEmpty()) {
             selectSql.append(" AND ").append(whereClause);
         }
         if (!deleteMultiple) {
-            selectSql.append(" LIMIT 1");
+            selectSql.append(" ").append(dialect.limitClause(1));
         }
 
         MapSqlParameterSource selectParams = new MapSqlParameterSource();
@@ -542,7 +475,6 @@ public class DynamicPostgresRepository {
 
         List<DynamicDocument> documents = jdbcTemplate.query(selectSql.toString(), selectParams, documentRowMapper);
 
-        // Soft delete each document
         Instant now = Instant.now();
         for (DynamicDocument doc : documents) {
             doc.setDeleted(true);
@@ -559,16 +491,17 @@ public class DynamicPostgresRepository {
     }
 
     /**
-     * Finds documents matching the given criteria (for use with QueryBuilder results)
+     * Finds documents matching the given criteria
      */
     public List<DynamicDocument> findDocuments(String tableName, String whereClause,
                                                 Map<String, Object> params, Integer limit) {
-        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
+        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents d WHERE d.table_name = :tableName AND ");
+        sql.append(buildDeletedCheck(false));
         if (whereClause != null && !whereClause.isEmpty()) {
             sql.append(" AND ").append(whereClause);
         }
         if (limit != null && limit > 0) {
-            sql.append(" LIMIT ").append(limit);
+            sql.append(" ").append(dialect.limitClause(limit));
         }
 
         MapSqlParameterSource paramSource = new MapSqlParameterSource();
@@ -614,12 +547,26 @@ public class DynamicPostgresRepository {
         return documents;
     }
 
+    /**
+     * Gets the configured dialect
+     */
+    public DatabaseDialect getDialect() {
+        return dialect;
+    }
+
+    private String buildDeletedCheck(boolean isDeleted) {
+        if (dialect.requiresBooleanConversion()) {
+            return "d.is_deleted = " + (isDeleted ? "1" : "0");
+        }
+        return "d.is_deleted = " + isDeleted;
+    }
+
     private MapSqlParameterSource buildInsertParams(DynamicDocument document) {
         MapSqlParameterSource params = new MapSqlParameterSource();
         params.addValue("tableName", document.getTableName());
         params.addValue("data", toJsonString(document.getDynamicFields()));
         params.addValue("version", document.getVersion());
-        params.addValue("isDeleted", document.isDeleted());
+        params.addValue("isDeleted", dialect.convertBoolean(document.isDeleted()));
         params.addValue("latestRequestId", document.getLatestRequestId());
         params.addValue("createdBy", document.getCreatedBy());
         params.addValue("lastModifiedBy", document.getLastModifiedBy());

@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
  * Regex operator: regex
@@ -14,6 +15,6 @@ public class RegexOperator extends ComparisonOperator {
 
     @Override
     public SqlPredicate apply(String fieldName, Object value) {
-        return SqlPredicate.jsonbRegex(fieldName, value);
+        return SqlPredicateFactory.jsonRegex(fieldName, value);
     }
 }

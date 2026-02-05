@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
  * Not equal operator: ne
@@ -13,6 +14,6 @@ public class NotEqualOperator extends ComparisonOperator {
 
     @Override
     public SqlPredicate apply(String fieldName, Object value) {
-        return SqlPredicate.jsonbNotEquals(fieldName, value);
+        return SqlPredicateFactory.jsonNotEquals(fieldName, value);
     }
 }

@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
  * Greater than or equal operator: gte
@@ -13,6 +14,6 @@ public class GreaterThanEqualOperator extends ComparisonOperator {
 
     @Override
     public SqlPredicate apply(String fieldName, Object value) {
-        return SqlPredicate.jsonbGreaterThanOrEqual(fieldName, value);
+        return SqlPredicateFactory.jsonGreaterThanOrEqual(fieldName, value);
     }
 }

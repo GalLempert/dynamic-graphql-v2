@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
  * Type operator: type
@@ -14,7 +15,7 @@ public class TypeOperator extends ComparisonOperator {
 
     @Override
     public SqlPredicate apply(String fieldName, Object value) {
-        return SqlPredicate.jsonbType(fieldName, value);
+        return SqlPredicateFactory.jsonType(fieldName, value);
     }
 
     @Override

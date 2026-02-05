@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
  * Exists operator: exists
@@ -17,7 +18,7 @@ public class ExistsOperator extends ComparisonOperator {
         if (value instanceof Boolean) {
             shouldExist = (Boolean) value;
         }
-        return SqlPredicate.jsonbExists(fieldName, shouldExist);
+        return SqlPredicateFactory.jsonExists(fieldName, shouldExist);
     }
 
     @Override

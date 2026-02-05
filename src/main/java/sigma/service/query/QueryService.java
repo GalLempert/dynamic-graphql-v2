@@ -3,7 +3,7 @@ package sigma.service.query;
 import sigma.dto.request.QueryRequest;
 import sigma.dto.response.QueryResponse;
 import sigma.model.Endpoint;
-import sigma.persistence.repository.DynamicPostgresRepository;
+import sigma.persistence.repository.DynamicDocumentRepository;
 import sigma.service.query.strategy.QueryExecutionStrategyFactory;
 import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
@@ -19,11 +19,11 @@ public class QueryService {
 
     private static final Logger logger = LoggerFactory.getLogger(QueryService.class);
 
-    private final DynamicPostgresRepository postgresRepository;
+    private final DynamicDocumentRepository postgresRepository;
     private final QueryBuilder queryBuilder;
     private final QueryExecutionStrategyFactory strategyFactory;
 
-    public QueryService(DynamicPostgresRepository postgresRepository,
+    public QueryService(DynamicDocumentRepository postgresRepository,
                         QueryBuilder queryBuilder,
                         QueryExecutionStrategyFactory strategyFactory) {
         this.postgresRepository = postgresRepository;
@@ -35,7 +35,7 @@ public class QueryService {
      * Provides access to repository for polymorphic request execution
      * Used by QueryRequest implementations via Template Method pattern
      */
-    public DynamicPostgresRepository getRepository() {
+    public DynamicDocumentRepository getRepository() {
         return postgresRepository;
     }
 

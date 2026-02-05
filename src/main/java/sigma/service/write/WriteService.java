@@ -6,7 +6,7 @@ import sigma.filter.FilterTranslator;
 import sigma.model.DynamicDocument;
 import sigma.model.Endpoint;
 import sigma.model.filter.FilterResult;
-import sigma.persistence.repository.DynamicPostgresRepository;
+import sigma.persistence.repository.DynamicDocumentRepository;
 import sigma.service.write.subentity.SubEntityProcessor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -31,13 +31,13 @@ public class WriteService {
 
     private static final Logger logger = LoggerFactory.getLogger(WriteService.class);
 
-    private final DynamicPostgresRepository repository;
+    private final DynamicDocumentRepository repository;
     private final FilterTranslator filterTranslator;
     private final SubEntityProcessor subEntityProcessor;
     private final DocumentChangeDetector documentChangeDetector;
     private final ThreadLocal<Endpoint> endpointContext = new ThreadLocal<>();
 
-    public WriteService(DynamicPostgresRepository repository,
+    public WriteService(DynamicDocumentRepository repository,
                         FilterTranslator filterTranslator,
                         SubEntityProcessor subEntityProcessor,
                         DocumentChangeDetector documentChangeDetector) {

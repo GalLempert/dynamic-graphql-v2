@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 import java.util.List;
 
@@ -16,7 +17,7 @@ public class NotInOperator extends ComparisonOperator {
     @Override
     public SqlPredicate apply(String fieldName, Object value) {
         if (value instanceof List) {
-            return SqlPredicate.jsonbNotIn(fieldName, (List<?>) value);
+            return SqlPredicateFactory.jsonNotIn(fieldName, (List<?>) value);
         }
         throw new IllegalArgumentException("nin operator requires a list value");
     }

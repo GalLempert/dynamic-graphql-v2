@@ -1,6 +1,7 @@
 package sigma.model.filter.operator;
 
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
  * Less than operator: lt
@@ -13,6 +14,6 @@ public class LessThanOperator extends ComparisonOperator {
 
     @Override
     public SqlPredicate apply(String fieldName, Object value) {
-        return SqlPredicate.jsonbLessThan(fieldName, value);
+        return SqlPredicateFactory.jsonLessThan(fieldName, value);
     }
 }

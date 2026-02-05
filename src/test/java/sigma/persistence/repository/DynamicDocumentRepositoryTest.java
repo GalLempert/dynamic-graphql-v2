@@ -2,6 +2,8 @@ package sigma.persistence.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sigma.model.DynamicDocument;
+import sigma.persistence.dialect.DatabaseDialect;
+import sigma.persistence.dialect.PostgreSqlDialect;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -25,7 +27,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
-class DynamicPostgresRepositoryTest {
+class DynamicDocumentRepositoryTest {
 
     @Mock
     private NamedParameterJdbcTemplate jdbcTemplate;
@@ -39,14 +41,16 @@ class DynamicPostgresRepositoryTest {
     @Captor
     private ArgumentCaptor<MapSqlParameterSource> paramsCaptor;
 
-    private DynamicPostgresRepository repository;
+    private DynamicDocumentRepository repository;
     private ObjectMapper objectMapper;
+    private DatabaseDialect dialect;
     private final String TABLE_NAME = "test-collection";
 
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        repository = new DynamicPostgresRepository(jdbcTemplate, crudRepository, objectMapper);
+        dialect = new PostgreSqlDialect();
+        repository = new DynamicDocumentRepository(jdbcTemplate, crudRepository, objectMapper, dialect);
     }
 
     @Test
