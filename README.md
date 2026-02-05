@@ -315,6 +315,171 @@ X-Time-Format: UNIX
 ```
 Returns timestamps in Unix format (seconds since epoch). See [Supported Time Formats](#supported-time-formats) for all options.
 
+### 12. Nested Documents - Edit Items in Nested Arrays
+
+Nested documents allow you to expose array fields within parent documents as first-class queryable and mutable collections. This is useful for scenarios like order line items, user addresses, or any embedded array.
+
+#### ZooKeeper Configuration for Nested Endpoint
+```bash
+# Create nested endpoint for order items
+zkCli.sh create /dev/my-service/endpoints/order-items ""
+zkCli.sh create /dev/my-service/endpoints/order-items/path "/order-items"
+zkCli.sh create /dev/my-service/endpoints/order-items/httpMethod "GET,POST"
+zkCli.sh create /dev/my-service/endpoints/order-items/writeMethods "POST,PATCH,DELETE"
+zkCli.sh create /dev/my-service/endpoints/order-items/databaseCollection "orders"
+zkCli.sh create /dev/my-service/endpoints/order-items/type "REST"
+zkCli.sh create /dev/my-service/endpoints/order-items/fatherDocument "items"
+zkCli.sh create /dev/my-service/endpoints/order-items/subEntities "items"
+zkCli.sh create /dev/my-service/endpoints/order-items/schema "order-item-schema:required"
+
+# Create read filter configuration (for queries)
+zkCli.sh create /dev/my-service/endpoints/order-items/readFilter ""
+zkCli.sh create /dev/my-service/endpoints/order-items/readFilter/myId "\$eq"
+zkCli.sh create /dev/my-service/endpoints/order-items/readFilter/productId "\$eq,\$in"
+zkCli.sh create /dev/my-service/endpoints/order-items/readFilter/orderId "\$eq"
+
+# Create write filter configuration (for updates/deletes)
+zkCli.sh create /dev/my-service/endpoints/order-items/writeFilter ""
+zkCli.sh create /dev/my-service/endpoints/order-items/writeFilter/myId "\$eq"
+zkCli.sh create /dev/my-service/endpoints/order-items/writeFilter/orderId "\$eq"
+```
+
+Key configuration properties:
+- **`fatherDocument`**: Path to the array field within the parent document (e.g., `items`)
+- **`subEntities`**: Fields that require write-time orchestration for nested array mutations
+- **`readFilter`**: Configures allowed filter operators for read operations
+- **`writeFilter`**: Configures allowed filter operators for write operations (should be restrictive)
+
+#### Parent Document Structure (MongoDB)
+```json
+{
+  "_id": "order123",
+  "customerId": "cust456",
+  "status": "pending",
+  "items": [
+    {
+      "myId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "isDeleted": false,
+      "productId": "prod789",
+      "quantity": 2,
+      "price": 29.99
+    },
+    {
+      "myId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+      "isDeleted": false,
+      "productId": "prod790",
+      "quantity": 1,
+      "price": 49.99
+    }
+  ]
+}
+```
+
+Each nested item has:
+- **`myId`**: Unique identifier (auto-generated UUID if not provided)
+- **`isDeleted`**: Soft-delete flag for nested items
+
+#### READ - Get All Items from an Order
+```bash
+GET /api/order-items?orderId=order123
+```
+Returns all non-deleted items from the order's `items` array:
+```json
+[
+  {
+    "myId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+    "productId": "prod789",
+    "quantity": 2,
+    "price": 29.99
+  },
+  {
+    "myId": "b2c3d4e5-f6a7-8901-bcde-f12345678901",
+    "productId": "prod790",
+    "quantity": 1,
+    "price": 49.99
+  }
+]
+```
+
+#### CREATE - Add a New Item to an Order
+```bash
+POST /api/order-items
+Content-Type: application/json
+
+{
+  "filter": { "orderId": "order123" },
+  "document": {
+    "items": [{
+      "productId": "prod791",
+      "quantity": 3,
+      "price": 19.99
+    }]
+  }
+}
+```
+Creates a new item in the `items` array with an auto-generated `myId`.
+
+#### UPDATE - Modify an Existing Item
+```bash
+PATCH /api/order-items
+Content-Type: application/json
+
+{
+  "filter": {
+    "orderId": "order123",
+    "myId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  },
+  "updates": {
+    "items": [{
+      "myId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "quantity": 5
+    }]
+  }
+}
+```
+Updates only the specified fields of the nested item identified by `myId`.
+
+#### DELETE - Remove an Item (Soft Delete)
+```bash
+DELETE /api/order-items
+Content-Type: application/json
+
+{
+  "filter": {
+    "orderId": "order123",
+    "myId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  }
+}
+```
+Marks the nested item as deleted (`isDeleted: true`) without removing it from the array.
+
+Alternatively, you can use PATCH with the `isDeleted` flag:
+```bash
+PATCH /api/order-items
+Content-Type: application/json
+
+{
+  "filter": {
+    "orderId": "order123",
+    "myId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+  },
+  "updates": {
+    "items": [{
+      "myId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890",
+      "isDeleted": true
+    }]
+  }
+}
+```
+
+#### Filtering Nested Items
+```bash
+GET /api/order-items?orderId=order123&productId=prod789
+```
+Returns only items matching the filter criteria.
+
+For more details, see [NESTED_DOCUMENT_SUPPORT.md](docs/NESTED_DOCUMENT_SUPPORT.md).
+
 ## Supported Time Formats
 
 You can customize the timestamp format in API responses by sending the `X-Time-Format` header with your request. All timestamp fields (`createdAt`, `lastModifiedAt`) will be returned in the specified format.
