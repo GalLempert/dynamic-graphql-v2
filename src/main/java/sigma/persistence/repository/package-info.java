@@ -1,4 +1,4 @@
 /**
- * MongoDB repositories
+ * PostgreSQL repositories
  */
 package sigma.persistence.repository;

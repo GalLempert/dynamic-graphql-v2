@@ -2,7 +2,6 @@ package sigma.persistence.repository;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sigma.model.DynamicDocument;
-import sigma.persistence.entity.SequenceCheckpoint;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -23,7 +22,6 @@ import java.util.Optional;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -34,9 +32,6 @@ class DynamicPostgresRepositoryTest {
 
     @Mock
     private DynamicDocumentJpaRepository crudRepository;
-
-    @Mock
-    private SequenceCheckpointRepository checkpointRepository;
 
     @Captor
     private ArgumentCaptor<String> sqlCaptor;
@@ -51,7 +46,7 @@ class DynamicPostgresRepositoryTest {
     @BeforeEach
     void setUp() {
         objectMapper = new ObjectMapper();
-        repository = new DynamicPostgresRepository(jdbcTemplate, crudRepository, checkpointRepository, objectMapper);
+        repository = new DynamicPostgresRepository(jdbcTemplate, crudRepository, objectMapper);
     }
 
     @Test
@@ -315,5 +310,42 @@ class DynamicPostgresRepositoryTest {
 
         // Then
         assertNull(result);
+    }
+
+    @Test
+    void testGetNextPageBySequence() {
+        // Given
+        long startSequence = 0L;
+        int batchSize = 10;
+
+        DynamicDocument doc1 = new DynamicDocument();
+        doc1.setId(1L);
+        doc1.setSequenceNumber(5L);
+        doc1.setDynamicFields(Map.of("key", "value1"));
+
+        DynamicDocument doc2 = new DynamicDocument();
+        doc2.setId(2L);
+        doc2.setSequenceNumber(10L);
+        doc2.setDynamicFields(Map.of("key", "value2"));
+
+        when(jdbcTemplate.query(anyString(), any(MapSqlParameterSource.class), any(RowMapper.class)))
+                .thenReturn(List.of(doc1, doc2));
+
+        // When
+        Map<String, Object> result = repository.getNextPageBySequence(TABLE_NAME, startSequence, batchSize);
+
+        // Then
+        assertNotNull(result);
+        @SuppressWarnings("unchecked")
+        List<Map<String, Object>> data = (List<Map<String, Object>>) result.get("data");
+        assertEquals(2, data.size());
+        assertEquals(10L, result.get("nextSequence"));
+        assertFalse((Boolean) result.get("hasMore"));
+
+        // Verify the query uses sequence_number
+        verify(jdbcTemplate).query(sqlCaptor.capture(), any(MapSqlParameterSource.class), any(RowMapper.class));
+        String capturedSql = sqlCaptor.getValue();
+        assertTrue(capturedSql.contains("sequence_number > :startSequence"));
+        assertTrue(capturedSql.contains("ORDER BY sequence_number ASC"));
     }
 }

@@ -9,7 +9,6 @@ import sigma.model.enums.EnumValue;
 import sigma.model.schema.JsonSchema;
 import sigma.model.schema.SchemaReference;
 import sigma.service.schema.SchemaManager;
-import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -149,13 +148,9 @@ public class EnumResponseTransformer {
                 }
                 Object transformed = transformValue(value, segments, index + 1, dynamicEnum);
                 if (transformed != value) {
-                    if (currentMap instanceof Document document) {
-                        document.put(propertySegment.name(), transformed);
-                    } else {
-                        @SuppressWarnings("unchecked")
-                        Map<String, Object> writableMap = (Map<String, Object>) currentMap;
-                        writableMap.put(propertySegment.name(), transformed);
-                    }
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> writableMap = (Map<String, Object>) currentMap;
+                    writableMap.put(propertySegment.name(), transformed);
                 }
                 return current;
             }

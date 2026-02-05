@@ -2,9 +2,7 @@ package sigma.persistence.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.postgresql.util.PGobject;
 import sigma.model.DynamicDocument;
-import sigma.persistence.entity.SequenceCheckpoint;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.jdbc.core.RowMapper;
@@ -15,8 +13,6 @@ import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
@@ -40,17 +36,14 @@ public class DynamicPostgresRepository {
 
     private final NamedParameterJdbcTemplate jdbcTemplate;
     private final DynamicDocumentJpaRepository crudRepository;
-    private final SequenceCheckpointRepository checkpointRepository;
     private final ObjectMapper objectMapper;
 
     public DynamicPostgresRepository(
             NamedParameterJdbcTemplate jdbcTemplate,
             DynamicDocumentJpaRepository crudRepository,
-            SequenceCheckpointRepository checkpointRepository,
             ObjectMapper objectMapper) {
         this.jdbcTemplate = jdbcTemplate;
         this.crudRepository = crudRepository;
-        this.checkpointRepository = checkpointRepository;
         this.objectMapper = objectMapper;
     }
 
@@ -63,6 +56,7 @@ public class DynamicPostgresRepository {
         doc.setLatestRequestId(rs.getString("latest_request_id"));
         doc.setCreatedBy(rs.getString("created_by"));
         doc.setLastModifiedBy(rs.getString("last_modified_by"));
+        doc.setSequenceNumber(rs.getLong("sequence_number"));
 
         Timestamp createdAt = rs.getTimestamp("created_at");
         if (createdAt != null) {
@@ -271,67 +265,53 @@ public class DynamicPostgresRepository {
     }
 
     /**
-     * Gets the next page of changes using sequence-based pagination
-     * PostgreSQL doesn't have Change Streams like MongoDB, so we use a polling approach
-     * based on the last_modified_at timestamp and sequence tracking
+     * Gets the next page of changes using sequence-based pagination.
+     * Uses the sequence_number column which is automatically updated by a PostgreSQL trigger
+     * on every insert/update operation.
+     *
+     * @param tableName The table name
+     * @param startSequence The sequence number to start from (exclusive)
+     * @param batchSize Maximum number of documents to return
+     * @return Map containing "data" (list of change documents), "nextSequence", and "hasMore"
      */
     public Map<String, Object> getNextPageBySequence(String tableName, long startSequence, int batchSize) {
         logger.info("Getting next page for table: {}, startSequence: {}, batchSize: {}",
                 tableName, startSequence, batchSize);
 
-        // Get the checkpoint to find the last processed timestamp
-        var checkpointOpt = checkpointRepository.findByCollectionName(tableName);
-        Instant startTime = checkpointOpt
-                .filter(cp -> cp.getSequence() == startSequence)
-                .map(cp -> Instant.ofEpochMilli(cp.getLastUpdated()))
-                .orElse(Instant.EPOCH);
-
-        // Query for documents modified after the checkpoint
+        // Query for documents with sequence_number greater than startSequence
         String sql = "SELECT * FROM dynamic_documents WHERE table_name = :tableName " +
-                "AND last_modified_at > :startTime ORDER BY last_modified_at ASC LIMIT :batchSize";
+                "AND sequence_number > :startSequence ORDER BY sequence_number ASC LIMIT :batchSize";
 
         MapSqlParameterSource paramSource = new MapSqlParameterSource();
         paramSource.addValue("tableName", tableName);
-        paramSource.addValue("startTime", Timestamp.from(startTime));
+        paramSource.addValue("startSequence", startSequence);
         paramSource.addValue("batchSize", batchSize);
 
         List<DynamicDocument> documents = jdbcTemplate.query(sql, paramSource, documentRowMapper);
 
         List<Map<String, Object>> results = new ArrayList<>();
-        long currentSequence = startSequence;
-        Instant lastModified = startTime;
+        long nextSequence = startSequence;
 
         for (DynamicDocument doc : documents) {
             Map<String, Object> documentData = new HashMap<>();
-            documentData.put("operationType", "update");
+            documentData.put("operationType", doc.isDeleted() ? "delete" : "update");
             documentData.put("documentKey", Map.of("_id", doc.getId()));
             documentData.put("fullDocument", doc.toMap());
+            documentData.put("sequenceNumber", doc.getSequenceNumber());
             results.add(documentData);
 
-            currentSequence++;
-            if (doc.getLastModifiedAt() != null && doc.getLastModifiedAt().isAfter(lastModified)) {
-                lastModified = doc.getLastModifiedAt();
+            // Track the highest sequence number seen
+            if (doc.getSequenceNumber() != null && doc.getSequenceNumber() > nextSequence) {
+                nextSequence = doc.getSequenceNumber();
             }
-        }
-
-        // Save checkpoint if we processed any changes
-        if (!results.isEmpty()) {
-            saveNewCheckpoint(tableName, lastModified, currentSequence);
         }
 
         Map<String, Object> response = new HashMap<>();
         response.put("data", results);
-        response.put("nextSequence", currentSequence);
+        response.put("nextSequence", nextSequence);
         response.put("hasMore", !results.isEmpty() && results.size() == batchSize);
 
         return response;
-    }
-
-    private void saveNewCheckpoint(String tableName, Instant lastModified, long sequence) {
-        SequenceCheckpoint checkpoint = new SequenceCheckpoint(tableName, sequence, lastModified.toEpochMilli() + "");
-        checkpoint.setLastUpdated(lastModified.toEpochMilli());
-        checkpointRepository.save(checkpoint);
-        logger.debug("Saved checkpoint for table: {}, sequence: {}", tableName, sequence);
     }
 
     // ========== WRITE OPERATIONS ==========

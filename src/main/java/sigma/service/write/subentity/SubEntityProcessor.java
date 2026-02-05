@@ -1,6 +1,5 @@
 package sigma.service.write.subentity;
 
-import org.bson.Document;
 import org.springframework.stereotype.Component;
 
 import java.util.LinkedHashMap;
@@ -50,7 +49,7 @@ public class SubEntityProcessor {
     public void applyUpdateOperations(Map<String, Object> updates,
                                       Set<String> subEntityFields,
                                       boolean updateMultiple,
-                                      Supplier<Document> existingDocumentSupplier) {
+                                      Supplier<Map<String, Object>> existingDocumentSupplier) {
         if (subEntityFields == null || subEntityFields.isEmpty()) {
             return;
         }
@@ -63,7 +62,7 @@ public class SubEntityProcessor {
         if (updateMultiple) {
             throw new IllegalArgumentException("Sub-entity updates require updateMultiple=false");
         }
-        Document existingDocument = existingDocumentSupplier.get();
+        Map<String, Object> existingDocument = existingDocumentSupplier.get();
         if (existingDocument == null) {
             throw new IllegalArgumentException("No document found matching filter for sub-entity update");
         }
@@ -91,7 +90,7 @@ public class SubEntityProcessor {
 
     public void applyUpsertUpdate(Map<String, Object> updates,
                                   Set<String> subEntityFields,
-                                  Document existingDocument) {
+                                  Map<String, Object> existingDocument) {
         if (existingDocument == null) {
             throw new IllegalArgumentException("Existing document required for sub-entity upsert update");
         }

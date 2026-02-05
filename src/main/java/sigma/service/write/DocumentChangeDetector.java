@@ -1,6 +1,5 @@
 package sigma.service.write;
 
-import org.bson.Document;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -11,7 +10,7 @@ import java.util.Objects;
 
 /**
  * Evaluates whether applying a set of update operations will actually change
- * the stored MongoDB documents.
+ * the stored documents.
  *
  * <p>This component encapsulates the "dirty check" logic so the
  * {@link WriteService} can remain focused on orchestration responsibilities.
@@ -30,16 +29,16 @@ public class DocumentChangeDetector {
      * @return Result containing cloned documents with applied changes and a
      * flag indicating whether anything would actually change
      */
-    public DocumentChangeResult evaluate(List<Document> existingDocuments, Map<String, Object> updates) {
+    public DocumentChangeResult evaluate(List<Map<String, Object>> existingDocuments, Map<String, Object> updates) {
         if (existingDocuments == null || existingDocuments.isEmpty()) {
             return DocumentChangeResult.noChanges(List.of());
         }
 
-        List<Document> updatedSnapshots = new ArrayList<>(existingDocuments.size());
+        List<Map<String, Object>> updatedSnapshots = new ArrayList<>(existingDocuments.size());
         boolean anyChanges = false;
 
-        for (Document document : existingDocuments) {
-            Document snapshot = cloneDocument(document);
+        for (Map<String, Object> document : existingDocuments) {
+            Map<String, Object> snapshot = cloneDocument(document);
             boolean documentChanged = applyUpdates(snapshot, updates);
             updatedSnapshots.add(snapshot);
             if (documentChanged) {
@@ -50,11 +49,11 @@ public class DocumentChangeDetector {
         return new DocumentChangeResult(anyChanges, updatedSnapshots);
     }
 
-    private Document cloneDocument(Document source) {
-        return source == null ? new Document() : new Document(source);
+    private Map<String, Object> cloneDocument(Map<String, Object> source) {
+        return source == null ? new LinkedHashMap<>() : new LinkedHashMap<>(source);
     }
 
-    private boolean applyUpdates(Document target, Map<String, Object> updates) {
+    private boolean applyUpdates(Map<String, Object> target, Map<String, Object> updates) {
         if (updates == null || updates.isEmpty()) {
             return false;
         }
@@ -68,7 +67,7 @@ public class DocumentChangeDetector {
         return changed;
     }
 
-    private boolean applyUpdate(Document target, String key, Object newValue) {
+    private boolean applyUpdate(Map<String, Object> target, String key, Object newValue) {
         Object currentValue = readValue(target, key);
         if (Objects.equals(currentValue, newValue)) {
             return false;
@@ -127,4 +126,3 @@ public class DocumentChangeDetector {
         current.put(path[path.length - 1], value);
     }
 }
-

@@ -50,6 +50,13 @@ public class DynamicDocument extends AuditableBaseDocument {
     private Map<String, Object> dynamicFields;
 
     /**
+     * Sequence number for change tracking
+     * Automatically updated by a PostgreSQL trigger on insert/update
+     */
+    @Column("sequence_number")
+    private Long sequenceNumber;
+
+    /**
      * Default constructor
      */
     public DynamicDocument() {
