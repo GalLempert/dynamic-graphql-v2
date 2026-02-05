@@ -1,32 +1,29 @@
 package sigma.persistence.entity;
 
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.Id;
-import jakarta.persistence.Table;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 /**
  * Stores checkpoint information for sequence-based pagination
  * Used to track the last processed sequence for each table/collection
  */
-@Entity
-@Table(name = "sequence_checkpoints")
+@Table("sequence_checkpoints")
 public class SequenceCheckpoint {
 
     @Id
-    @Column(name = "id")
     private String id; // collectionName used as ID
 
-    @Column(name = "collection_name", nullable = false, unique = true)
+    @Column("collection_name")
     private String collectionName;
 
-    @Column(name = "sequence")
+    @Column("sequence")
     private long sequence;
 
-    @Column(name = "resume_token")
+    @Column("resume_token")
     private String resumeToken; // Stored as JSON string or timestamp
 
-    @Column(name = "last_updated")
+    @Column("last_updated")
     private long lastUpdated;
 
     public SequenceCheckpoint() {

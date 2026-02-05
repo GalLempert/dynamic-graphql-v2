@@ -1,17 +1,10 @@
 package sigma.model;
 
-import io.hypersistence.utils.hibernate.type.json.JsonType;
-import jakarta.persistence.Column;
-import jakarta.persistence.Entity;
-import jakarta.persistence.GeneratedValue;
-import jakarta.persistence.GenerationType;
-import jakarta.persistence.Id;
-import jakarta.persistence.Index;
-import jakarta.persistence.SequenceGenerator;
-import jakarta.persistence.Table;
 import lombok.Getter;
 import lombok.Setter;
-import org.hibernate.annotations.Type;
+import org.springframework.data.annotation.Id;
+import org.springframework.data.relational.core.mapping.Column;
+import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -32,11 +25,7 @@ import java.util.Map;
  */
 @Getter
 @Setter
-@Entity
-@Table(name = "dynamic_documents", indexes = {
-    @Index(name = "idx_table_name", columnList = "table_name"),
-    @Index(name = "idx_table_name_not_deleted", columnList = "table_name, is_deleted")
-})
+@Table("dynamic_documents")
 public class DynamicDocument extends AuditableBaseDocument {
 
     /**
@@ -44,23 +33,20 @@ public class DynamicDocument extends AuditableBaseDocument {
      * Auto-generated using a sequence
      */
     @Id
-    @GeneratedValue(strategy = GenerationType.SEQUENCE, generator = "dynamic_doc_seq")
-    @SequenceGenerator(name = "dynamic_doc_seq", sequenceName = "dynamic_documents_id_seq", allocationSize = 1)
     private Long id;
 
     /**
      * Logical table/collection name
      * Allows multiple logical collections to coexist in the same physical table
      */
-    @Column(name = "table_name", nullable = false)
+    @Column("table_name")
     private String tableName;
 
     /**
      * This JSONB column holds all the dynamic, user-defined fields (the schemaless payload)
      * Contains the actual business data submitted by the user
      */
-    @Type(JsonType.class)
-    @Column(name = "data", columnDefinition = "jsonb")
+    @Column("data")
     private Map<String, Object> dynamicFields;
 
     /**

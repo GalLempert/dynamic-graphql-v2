@@ -4,12 +4,12 @@ import sigma.dto.request.FilteredQueryRequest;
 import sigma.dto.request.QueryRequest;
 import sigma.filter.FilterTranslator;
 import sigma.model.filter.FilterRequest;
+import sigma.model.filter.FilterResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.mongodb.core.query.Query;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.mockito.Mockito.*;
@@ -32,14 +32,16 @@ class QueryBuilderTest {
         // Given
         FilterRequest filterRequest = new FilterRequest();
         FilteredQueryRequest request = new FilteredQueryRequest(filterRequest);
-        Query expectedQuery = new Query();
-        when(filterTranslator.translate(filterRequest)).thenReturn(expectedQuery);
+        FilterResult expectedResult = FilterResult.builder()
+                .whereClause("data->>'field' = :param0")
+                .build();
+        when(filterTranslator.translate(filterRequest)).thenReturn(expectedResult);
 
         // When
-        Query result = queryBuilder.build(request);
+        FilterResult result = queryBuilder.build(request);
 
         // Then
-        assertEquals(expectedQuery, result);
+        assertEquals(expectedResult, result);
         verify(filterTranslator).translate(filterRequest);
     }
 

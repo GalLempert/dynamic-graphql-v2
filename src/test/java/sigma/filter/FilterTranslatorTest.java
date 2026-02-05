@@ -1,17 +1,15 @@
 package sigma.filter;
 
 import sigma.model.filter.FilterRequest;
+import sigma.model.filter.FilterResult;
+import sigma.model.filter.SqlPredicate;
 import sigma.model.filter.node.FieldFilterNode;
 import sigma.model.filter.node.FilterNode;
-import org.bson.Document;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.mongodb.core.query.Criteria;
-import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.Map;
 
@@ -47,26 +45,20 @@ class FilterTranslatorTest {
         FilterRequest filterRequest = new FilterRequest(filterMap, options);
 
         FilterNode filterNode = mock(FilterNode.class);
-        Criteria criteria = Criteria.where("field").is("value");
+        SqlPredicate predicate = SqlPredicate.jsonbEquals("field", "value", "param0");
         when(filterParser.parse(filterMap)).thenReturn(filterNode);
-        when(filterNode.toCriteria()).thenReturn(criteria);
+        when(filterNode.toPredicate()).thenReturn(predicate);
 
         // When
-        Query query = filterTranslator.translate(filterRequest);
+        FilterResult result = filterTranslator.translate(filterRequest);
 
         // Then
-        assertNotNull(query);
-        assertEquals(new Document("field", "value"), query.getQueryObject());
-        assertEquals(10, query.getLimit());
-        assertEquals(5, query.getSkip());
-
-        // Verify sort
-        Document sortObject = query.getSortObject();
-        assertEquals(1, sortObject.get("field"));
-
-        // Verify projection
-        Document fieldsObject = query.getFieldsObject();
-        assertEquals(1, fieldsObject.get("field"));
+        assertNotNull(result);
+        assertNotNull(result.getWhereClause());
+        assertTrue(result.getWhereClause().contains("param0"));
+        assertEquals(10, result.getLimit());
+        assertEquals(5, result.getOffset());
+        assertNotNull(result.getOrderByClause());
     }
 
     @Test
@@ -75,11 +67,11 @@ class FilterTranslatorTest {
         FilterRequest filterRequest = new FilterRequest();
 
         // When
-        Query query = filterTranslator.translate(filterRequest);
+        FilterResult result = filterTranslator.translate(filterRequest);
 
         // Then
-        assertNotNull(query);
-        assertTrue(query.getQueryObject().isEmpty());
+        assertNotNull(result);
+        assertNull(result.getWhereClause());
     }
 
     @Test
@@ -94,19 +86,21 @@ class FilterTranslatorTest {
         );
 
         // When
-        Query query = filterTranslator.translateGetParameters(params);
+        FilterResult result = filterTranslator.translateGetParameters(params);
 
         // Then
-        assertNotNull(query);
-        Document queryObject = query.getQueryObject();
-        assertEquals("Alice", queryObject.get("name"));
-        assertEquals("30", queryObject.get("age"));
+        assertNotNull(result);
+        assertNotNull(result.getWhereClause());
+        // Check that the where clause contains the field predicates
+        assertTrue(result.getWhereClause().contains("name") || result.getParameters().values().stream().anyMatch(v -> "Alice".equals(v)));
+        assertTrue(result.getWhereClause().contains("age") || result.getParameters().values().stream().anyMatch(v -> "30".equals(v)));
 
-        assertEquals(20, query.getLimit());
-        assertEquals(10, query.getSkip());
+        assertEquals(20, result.getLimit());
+        assertEquals(10, result.getOffset());
 
-        Document sortObject = query.getSortObject();
-        assertEquals(-1, sortObject.get("createdAt"));
+        // Check sort
+        assertNotNull(result.getOrderByClause());
+        assertTrue(result.getOrderByClause().contains("DESC"));
     }
 
     @Test
@@ -117,10 +111,10 @@ class FilterTranslatorTest {
         );
 
         // When
-        Query query = filterTranslator.translateGetParameters(params);
+        FilterResult result = filterTranslator.translateGetParameters(params);
 
         // Then
-        Document sortObject = query.getSortObject();
-        assertEquals(1, sortObject.get("createdAt"));
+        assertNotNull(result.getOrderByClause());
+        assertTrue(result.getOrderByClause().contains("ASC"));
     }
 }

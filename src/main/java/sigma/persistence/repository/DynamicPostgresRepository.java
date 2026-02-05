@@ -2,16 +2,22 @@ package sigma.persistence.repository;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.postgresql.util.PGobject;
 import sigma.model.DynamicDocument;
 import sigma.persistence.entity.SequenceCheckpoint;
-import jakarta.persistence.EntityManager;
-import jakarta.persistence.PersistenceContext;
-import jakarta.persistence.TypedQuery;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.jdbc.core.RowMapper;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.support.GeneratedKeyHolder;
+import org.springframework.jdbc.support.KeyHolder;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -21,7 +27,7 @@ import java.util.stream.Collectors;
 
 /**
  * Dynamic PostgreSQL repository for querying and writing to the dynamic_documents table
- * Uses JSONB for storing schemaless data with PostgreSQL-specific operators
+ * Uses JDBC with JSONB for storing schemaless data with PostgreSQL-specific operators
  *
  * Supports:
  * - Read operations (queries with JSONB filtering, pagination)
@@ -32,21 +38,56 @@ public class DynamicPostgresRepository {
 
     private static final Logger logger = LoggerFactory.getLogger(DynamicPostgresRepository.class);
 
-    @PersistenceContext
-    private EntityManager entityManager;
-
-    private final DynamicDocumentJpaRepository jpaRepository;
+    private final NamedParameterJdbcTemplate jdbcTemplate;
+    private final DynamicDocumentJpaRepository crudRepository;
     private final SequenceCheckpointRepository checkpointRepository;
     private final ObjectMapper objectMapper;
 
     public DynamicPostgresRepository(
-            DynamicDocumentJpaRepository jpaRepository,
+            NamedParameterJdbcTemplate jdbcTemplate,
+            DynamicDocumentJpaRepository crudRepository,
             SequenceCheckpointRepository checkpointRepository,
             ObjectMapper objectMapper) {
-        this.jpaRepository = jpaRepository;
+        this.jdbcTemplate = jdbcTemplate;
+        this.crudRepository = crudRepository;
         this.checkpointRepository = checkpointRepository;
         this.objectMapper = objectMapper;
     }
+
+    private final RowMapper<DynamicDocument> documentRowMapper = (rs, rowNum) -> {
+        DynamicDocument doc = new DynamicDocument();
+        doc.setId(rs.getLong("id"));
+        doc.setTableName(rs.getString("table_name"));
+        doc.setVersion(rs.getLong("version"));
+        doc.setDeleted(rs.getBoolean("is_deleted"));
+        doc.setLatestRequestId(rs.getString("latest_request_id"));
+        doc.setCreatedBy(rs.getString("created_by"));
+        doc.setLastModifiedBy(rs.getString("last_modified_by"));
+
+        Timestamp createdAt = rs.getTimestamp("created_at");
+        if (createdAt != null) {
+            doc.setCreatedAt(createdAt.toInstant());
+        }
+        Timestamp lastModifiedAt = rs.getTimestamp("last_modified_at");
+        if (lastModifiedAt != null) {
+            doc.setLastModifiedAt(lastModifiedAt.toInstant());
+        }
+
+        // Parse JSONB data column
+        String dataJson = rs.getString("data");
+        if (dataJson != null) {
+            try {
+                @SuppressWarnings("unchecked")
+                Map<String, Object> data = objectMapper.readValue(dataJson, Map.class);
+                doc.setDynamicFields(data);
+            } catch (JsonProcessingException e) {
+                logger.error("Error parsing JSONB data for document {}", doc.getId(), e);
+                doc.setDynamicFields(new HashMap<>());
+            }
+        }
+
+        return doc;
+    };
 
     /**
      * Performs a select * query on the specified table (collection)
@@ -54,7 +95,7 @@ public class DynamicPostgresRepository {
      */
     public List<Map<String, Object>> findAll(String tableName) {
         logger.debug("Querying all documents from table: {}", tableName);
-        List<DynamicDocument> documents = jpaRepository.findByTableNameAndNotDeleted(tableName);
+        List<DynamicDocument> documents = crudRepository.findByTableNameAndNotDeleted(tableName);
         return documents.stream()
                 .map(DynamicDocument::toMap)
                 .collect(Collectors.toList());
@@ -82,31 +123,31 @@ public class DynamicPostgresRepository {
 
         logger.debug("Executing query on table {}: WHERE {} ORDER BY {}", tableName, whereClause, orderByClause);
 
-        StringBuilder jpql = new StringBuilder("SELECT d FROM DynamicDocument d WHERE d.tableName = :tableName AND d.isDeleted = false");
+        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
 
         if (whereClause != null && !whereClause.isEmpty()) {
-            jpql.append(" AND ").append(whereClause);
+            sql.append(" AND ").append(whereClause);
         }
 
         if (orderByClause != null && !orderByClause.isEmpty()) {
-            jpql.append(" ORDER BY ").append(orderByClause);
+            sql.append(" ORDER BY ").append(orderByClause);
         }
 
-        TypedQuery<DynamicDocument> query = entityManager.createQuery(jpql.toString(), DynamicDocument.class);
-        query.setParameter("tableName", tableName);
-
-        if (params != null) {
-            params.forEach(query::setParameter);
+        if (limit != null && limit > 0) {
+            sql.append(" LIMIT ").append(limit);
         }
 
         if (offset != null && offset > 0) {
-            query.setFirstResult(offset);
-        }
-        if (limit != null && limit > 0) {
-            query.setMaxResults(limit);
+            sql.append(" OFFSET ").append(offset);
         }
 
-        List<DynamicDocument> documents = query.getResultList();
+        MapSqlParameterSource paramSource = new MapSqlParameterSource();
+        paramSource.addValue("tableName", tableName);
+        if (params != null) {
+            params.forEach(paramSource::addValue);
+        }
+
+        List<DynamicDocument> documents = jdbcTemplate.query(sql.toString(), paramSource, documentRowMapper);
         return documents.stream()
                 .map(DynamicDocument::toMap)
                 .collect(Collectors.toList());
@@ -118,22 +159,21 @@ public class DynamicPostgresRepository {
      * payloads after delete operations).
      */
     public List<Map<String, Object>> findRaw(String tableName, String whereClause, Map<String, Object> params) {
-        StringBuilder jpql = new StringBuilder("SELECT d FROM DynamicDocument d WHERE d.tableName = :tableName");
+        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName");
 
         if (whereClause != null && !whereClause.isEmpty()) {
-            jpql.append(" AND ").append(whereClause);
+            sql.append(" AND ").append(whereClause);
         }
 
-        logger.debug("Executing raw query on table {}: {}", tableName, jpql);
+        logger.debug("Executing raw query on table {}: {}", tableName, sql);
 
-        TypedQuery<DynamicDocument> query = entityManager.createQuery(jpql.toString(), DynamicDocument.class);
-        query.setParameter("tableName", tableName);
-
+        MapSqlParameterSource paramSource = new MapSqlParameterSource();
+        paramSource.addValue("tableName", tableName);
         if (params != null) {
-            params.forEach(query::setParameter);
+            params.forEach(paramSource::addValue);
         }
 
-        List<DynamicDocument> documents = query.getResultList();
+        List<DynamicDocument> documents = jdbcTemplate.query(sql.toString(), paramSource, documentRowMapper);
         return documents.stream()
                 .map(DynamicDocument::toMap)
                 .collect(Collectors.toList());
@@ -152,7 +192,7 @@ public class DynamicPostgresRepository {
         }
 
         logger.debug("Fetching {} documents by id from table {}", ids.size(), tableName);
-        List<DynamicDocument> documents = jpaRepository.findByIdInAndTableName(ids, tableName);
+        List<DynamicDocument> documents = crudRepository.findByIdInAndTableName(ids, tableName);
         return documents.stream()
                 .map(DynamicDocument::toMap)
                 .collect(Collectors.toList());
@@ -207,28 +247,25 @@ public class DynamicPostgresRepository {
             sql.append(" OFFSET ").append(offset);
         }
 
-        var nativeQuery = entityManager.createNativeQuery(sql.toString());
-        nativeQuery.setParameter("tableName", tableName);
-
+        MapSqlParameterSource paramSource = new MapSqlParameterSource();
+        paramSource.addValue("tableName", tableName);
         if (params != null) {
-            params.forEach(nativeQuery::setParameter);
+            params.forEach(paramSource::addValue);
         }
 
-        List<Object> results = nativeQuery.getResultList();
         List<Map<String, Object>> nestedDocs = new ArrayList<>();
 
-        for (Object result : results) {
+        jdbcTemplate.query(sql.toString(), paramSource, (rs) -> {
             try {
-                if (result instanceof String) {
-                    Map<String, Object> doc = objectMapper.readValue((String) result, Map.class);
+                String nestedJson = rs.getString("nested_doc");
+                if (nestedJson != null) {
+                    Map<String, Object> doc = objectMapper.readValue(nestedJson, Map.class);
                     nestedDocs.add(doc);
-                } else if (result instanceof Map) {
-                    nestedDocs.add((Map<String, Object>) result);
                 }
             } catch (JsonProcessingException e) {
                 logger.error("Error parsing nested document JSON", e);
             }
-        }
+        });
 
         return nestedDocs;
     }
@@ -250,15 +287,15 @@ public class DynamicPostgresRepository {
                 .orElse(Instant.EPOCH);
 
         // Query for documents modified after the checkpoint
-        String jpql = "SELECT d FROM DynamicDocument d WHERE d.tableName = :tableName " +
-                "AND d.lastModifiedAt > :startTime ORDER BY d.lastModifiedAt ASC";
+        String sql = "SELECT * FROM dynamic_documents WHERE table_name = :tableName " +
+                "AND last_modified_at > :startTime ORDER BY last_modified_at ASC LIMIT :batchSize";
 
-        TypedQuery<DynamicDocument> query = entityManager.createQuery(jpql, DynamicDocument.class);
-        query.setParameter("tableName", tableName);
-        query.setParameter("startTime", startTime);
-        query.setMaxResults(batchSize);
+        MapSqlParameterSource paramSource = new MapSqlParameterSource();
+        paramSource.addValue("tableName", tableName);
+        paramSource.addValue("startTime", Timestamp.from(startTime));
+        paramSource.addValue("batchSize", batchSize);
 
-        List<DynamicDocument> documents = query.getResultList();
+        List<DynamicDocument> documents = jdbcTemplate.query(sql, paramSource, documentRowMapper);
 
         List<Map<String, Object>> results = new ArrayList<>();
         long currentSequence = startSequence;
@@ -301,7 +338,7 @@ public class DynamicPostgresRepository {
 
     /**
      * Inserts a single document into the table
-     * Uses DynamicDocument for automatic audit field management
+     * Uses native SQL for full control over JSONB insertion
      *
      * @param tableName The table name
      * @param document The DynamicDocument to insert
@@ -312,16 +349,37 @@ public class DynamicPostgresRepository {
         logger.info("Inserting document into table: {}", tableName);
 
         document.setTableName(tableName);
-        DynamicDocument saved = jpaRepository.save(document);
+        Instant now = Instant.now();
+        if (document.getCreatedAt() == null) {
+            document.setCreatedAt(now);
+        }
+        document.setLastModifiedAt(now);
+        if (document.getVersion() == null) {
+            document.setVersion(0L);
+        }
 
-        Long insertedId = saved.getId();
-        logger.info("Successfully inserted document with id: {} (version: {})", insertedId, saved.getVersion());
+        String sql = """
+            INSERT INTO dynamic_documents (table_name, data, version, is_deleted, latest_request_id,
+                created_by, last_modified_by, created_at, last_modified_at)
+            VALUES (:tableName, :data::jsonb, :version, :isDeleted, :latestRequestId,
+                :createdBy, :lastModifiedBy, :createdAt, :lastModifiedAt)
+            RETURNING id
+            """;
+
+        MapSqlParameterSource params = buildInsertParams(document);
+
+        KeyHolder keyHolder = new GeneratedKeyHolder();
+        jdbcTemplate.update(sql, params, keyHolder, new String[]{"id"});
+
+        Long insertedId = keyHolder.getKey() != null ? keyHolder.getKey().longValue() : null;
+        document.setId(insertedId);
+
+        logger.info("Successfully inserted document with id: {} (version: {})", insertedId, document.getVersion());
         return insertedId;
     }
 
     /**
      * Inserts multiple documents into the table (bulk insert)
-     * Uses DynamicDocument for automatic audit field management
      *
      * @param tableName The table name
      * @param documents The DynamicDocuments to insert
@@ -331,12 +389,11 @@ public class DynamicPostgresRepository {
     public List<Long> insertMany(String tableName, List<DynamicDocument> documents) {
         logger.info("Inserting {} documents into table: {}", documents.size(), tableName);
 
-        documents.forEach(doc -> doc.setTableName(tableName));
-        List<DynamicDocument> savedDocs = jpaRepository.saveAll(documents);
-
-        List<Long> insertedIds = savedDocs.stream()
-                .map(DynamicDocument::getId)
-                .collect(Collectors.toList());
+        List<Long> insertedIds = new ArrayList<>();
+        for (DynamicDocument document : documents) {
+            Long id = insertOne(tableName, document);
+            insertedIds.add(id);
+        }
 
         logger.info("Successfully inserted {} documents with audit fields", insertedIds.size());
         return insertedIds;
@@ -358,23 +415,24 @@ public class DynamicPostgresRepository {
         logger.info("Updating documents in table: {} (multiple: {})", tableName, updateMultiple);
 
         // First, find matching documents
-        StringBuilder jpql = new StringBuilder("SELECT d FROM DynamicDocument d WHERE d.tableName = :tableName AND d.isDeleted = false");
+        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
         if (whereClause != null && !whereClause.isEmpty()) {
-            jpql.append(" AND ").append(whereClause);
-        }
-
-        TypedQuery<DynamicDocument> query = entityManager.createQuery(jpql.toString(), DynamicDocument.class);
-        query.setParameter("tableName", tableName);
-        if (params != null) {
-            params.forEach(query::setParameter);
+            selectSql.append(" AND ").append(whereClause);
         }
         if (!updateMultiple) {
-            query.setMaxResults(1);
+            selectSql.append(" LIMIT 1");
         }
 
-        List<DynamicDocument> documents = query.getResultList();
+        MapSqlParameterSource selectParams = new MapSqlParameterSource();
+        selectParams.addValue("tableName", tableName);
+        if (params != null) {
+            params.forEach(selectParams::addValue);
+        }
+
+        List<DynamicDocument> documents = jdbcTemplate.query(selectSql.toString(), selectParams, documentRowMapper);
 
         // Apply updates to each document
+        Instant now = Instant.now();
         for (DynamicDocument doc : documents) {
             Map<String, Object> dynamicFields = doc.getDynamicFields();
             if (dynamicFields == null) {
@@ -382,13 +440,35 @@ public class DynamicPostgresRepository {
             }
             dynamicFields.putAll(updates);
             doc.setDynamicFields(dynamicFields);
-        }
+            doc.setLastModifiedAt(now);
+            doc.setVersion(doc.getVersion() != null ? doc.getVersion() + 1 : 1L);
 
-        // Save all updated documents
-        jpaRepository.saveAll(documents);
+            updateDocument(doc);
+        }
 
         logger.info("Update result: modified={}", documents.size());
         return documents.size();
+    }
+
+    private void updateDocument(DynamicDocument document) {
+        String sql = """
+            UPDATE dynamic_documents
+            SET data = :data::jsonb, version = :version, is_deleted = :isDeleted,
+                latest_request_id = :latestRequestId, last_modified_by = :lastModifiedBy,
+                last_modified_at = :lastModifiedAt
+            WHERE id = :id
+            """;
+
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("id", document.getId());
+        params.addValue("data", toJsonString(document.getDynamicFields()));
+        params.addValue("version", document.getVersion());
+        params.addValue("isDeleted", document.isDeleted());
+        params.addValue("latestRequestId", document.getLatestRequestId());
+        params.addValue("lastModifiedBy", document.getLastModifiedBy());
+        params.addValue("lastModifiedAt", Timestamp.from(document.getLastModifiedAt()));
+
+        jdbcTemplate.update(sql, params);
     }
 
     /**
@@ -406,28 +486,28 @@ public class DynamicPostgresRepository {
         logger.info("Upserting document in table: {}", tableName);
 
         // Try to find existing document
-        StringBuilder jpql = new StringBuilder("SELECT d FROM DynamicDocument d WHERE d.tableName = :tableName AND d.isDeleted = false");
+        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
         if (whereClause != null && !whereClause.isEmpty()) {
-            jpql.append(" AND ").append(whereClause);
+            selectSql.append(" AND ").append(whereClause);
         }
+        selectSql.append(" LIMIT 1");
 
-        TypedQuery<DynamicDocument> query = entityManager.createQuery(jpql.toString(), DynamicDocument.class);
-        query.setParameter("tableName", tableName);
+        MapSqlParameterSource selectParams = new MapSqlParameterSource();
+        selectParams.addValue("tableName", tableName);
         if (params != null) {
-            params.forEach(query::setParameter);
+            params.forEach(selectParams::addValue);
         }
-        query.setMaxResults(1);
 
-        List<DynamicDocument> existing = query.getResultList();
+        List<DynamicDocument> existing = jdbcTemplate.query(selectSql.toString(), selectParams, documentRowMapper);
 
         Map<String, Object> result = new HashMap<>();
 
         if (existing.isEmpty()) {
             // Insert new document
             DynamicDocument newDoc = new DynamicDocument(tableName, document);
-            DynamicDocument saved = jpaRepository.save(newDoc);
-            result.put("upsertedId", saved.getId());
-            logger.info("Upserted new document with id: {}", saved.getId());
+            Long insertedId = insertOne(tableName, newDoc);
+            result.put("upsertedId", insertedId);
+            logger.info("Upserted new document with id: {}", insertedId);
         } else {
             // Update existing document
             DynamicDocument doc = existing.get(0);
@@ -437,7 +517,10 @@ public class DynamicPostgresRepository {
             }
             dynamicFields.putAll(document);
             doc.setDynamicFields(dynamicFields);
-            jpaRepository.save(doc);
+            doc.setLastModifiedAt(Instant.now());
+            doc.setVersion(doc.getVersion() != null ? doc.getVersion() + 1 : 1L);
+
+            updateDocument(doc);
 
             result.put("matchedCount", 1L);
             result.put("modifiedCount", 1L);
@@ -463,31 +546,33 @@ public class DynamicPostgresRepository {
         logger.info("Deleting documents from table: {} (multiple: {})", tableName, deleteMultiple);
 
         // Find matching documents
-        StringBuilder jpql = new StringBuilder("SELECT d FROM DynamicDocument d WHERE d.tableName = :tableName AND d.isDeleted = false");
+        StringBuilder selectSql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
         if (whereClause != null && !whereClause.isEmpty()) {
-            jpql.append(" AND ").append(whereClause);
-        }
-
-        TypedQuery<DynamicDocument> query = entityManager.createQuery(jpql.toString(), DynamicDocument.class);
-        query.setParameter("tableName", tableName);
-        if (params != null) {
-            params.forEach(query::setParameter);
+            selectSql.append(" AND ").append(whereClause);
         }
         if (!deleteMultiple) {
-            query.setMaxResults(1);
+            selectSql.append(" LIMIT 1");
         }
 
-        List<DynamicDocument> documents = query.getResultList();
+        MapSqlParameterSource selectParams = new MapSqlParameterSource();
+        selectParams.addValue("tableName", tableName);
+        if (params != null) {
+            params.forEach(selectParams::addValue);
+        }
+
+        List<DynamicDocument> documents = jdbcTemplate.query(selectSql.toString(), selectParams, documentRowMapper);
 
         // Soft delete each document
+        Instant now = Instant.now();
         for (DynamicDocument doc : documents) {
             doc.setDeleted(true);
+            doc.setLastModifiedAt(now);
+            doc.setVersion(doc.getVersion() != null ? doc.getVersion() + 1 : 1L);
             if (requestId != null) {
                 doc.setLatestRequestId(requestId);
             }
+            updateDocument(doc);
         }
-
-        jpaRepository.saveAll(documents);
 
         logger.info("Soft delete result: modified={}", documents.size());
         return documents.size();
@@ -498,28 +583,28 @@ public class DynamicPostgresRepository {
      */
     public List<DynamicDocument> findDocuments(String tableName, String whereClause,
                                                 Map<String, Object> params, Integer limit) {
-        StringBuilder jpql = new StringBuilder("SELECT d FROM DynamicDocument d WHERE d.tableName = :tableName AND d.isDeleted = false");
+        StringBuilder sql = new StringBuilder("SELECT * FROM dynamic_documents WHERE table_name = :tableName AND is_deleted = false");
         if (whereClause != null && !whereClause.isEmpty()) {
-            jpql.append(" AND ").append(whereClause);
-        }
-
-        TypedQuery<DynamicDocument> query = entityManager.createQuery(jpql.toString(), DynamicDocument.class);
-        query.setParameter("tableName", tableName);
-        if (params != null) {
-            params.forEach(query::setParameter);
+            sql.append(" AND ").append(whereClause);
         }
         if (limit != null && limit > 0) {
-            query.setMaxResults(limit);
+            sql.append(" LIMIT ").append(limit);
         }
 
-        return query.getResultList();
+        MapSqlParameterSource paramSource = new MapSqlParameterSource();
+        paramSource.addValue("tableName", tableName);
+        if (params != null) {
+            params.forEach(paramSource::addValue);
+        }
+
+        return jdbcTemplate.query(sql.toString(), paramSource, documentRowMapper);
     }
 
     /**
      * Get a single document by ID
      */
     public DynamicDocument findById(String tableName, Long id) {
-        return jpaRepository.findByIdAndTableName(id, tableName).orElse(null);
+        return crudRepository.findByIdAndTableName(id, tableName).orElse(null);
     }
 
     /**
@@ -527,7 +612,15 @@ public class DynamicPostgresRepository {
      */
     @Transactional
     public DynamicDocument save(DynamicDocument document) {
-        return jpaRepository.save(document);
+        if (document.getId() == null) {
+            Long id = insertOne(document.getTableName(), document);
+            document.setId(id);
+        } else {
+            document.setLastModifiedAt(Instant.now());
+            document.setVersion(document.getVersion() != null ? document.getVersion() + 1 : 1L);
+            updateDocument(document);
+        }
+        return document;
     }
 
     /**
@@ -535,6 +628,31 @@ public class DynamicPostgresRepository {
      */
     @Transactional
     public List<DynamicDocument> saveAll(List<DynamicDocument> documents) {
-        return jpaRepository.saveAll(documents);
+        for (DynamicDocument doc : documents) {
+            save(doc);
+        }
+        return documents;
+    }
+
+    private MapSqlParameterSource buildInsertParams(DynamicDocument document) {
+        MapSqlParameterSource params = new MapSqlParameterSource();
+        params.addValue("tableName", document.getTableName());
+        params.addValue("data", toJsonString(document.getDynamicFields()));
+        params.addValue("version", document.getVersion());
+        params.addValue("isDeleted", document.isDeleted());
+        params.addValue("latestRequestId", document.getLatestRequestId());
+        params.addValue("createdBy", document.getCreatedBy());
+        params.addValue("lastModifiedBy", document.getLastModifiedBy());
+        params.addValue("createdAt", document.getCreatedAt() != null ? Timestamp.from(document.getCreatedAt()) : null);
+        params.addValue("lastModifiedAt", document.getLastModifiedAt() != null ? Timestamp.from(document.getLastModifiedAt()) : null);
+        return params;
+    }
+
+    private String toJsonString(Map<String, Object> map) {
+        try {
+            return objectMapper.writeValueAsString(map != null ? map : new HashMap<>());
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException("Failed to convert Map to JSON string", e);
+        }
     }
 }
