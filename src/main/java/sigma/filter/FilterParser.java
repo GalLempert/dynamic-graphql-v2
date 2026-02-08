@@ -32,7 +32,7 @@ public class FilterParser {
             String key = entry.getKey();
             Object value = entry.getValue();
 
-            if (key.startsWith("$")) {
+            if (isLogicalOperator(key)) {
                 // Logical operator
                 FilterNode logicalNode = parseLogicalOperator(key, value);
                 nodes.add(logicalNode);
@@ -53,6 +53,15 @@ public class FilterParser {
     }
 
     /**
+     * Checks if the given key is a logical operator (and, or, not, nor)
+     */
+    private boolean isLogicalOperator(String key) {
+        String lowerKey = key.toLowerCase();
+        return lowerKey.equals("and") || lowerKey.equals("or") ||
+               lowerKey.equals("not") || lowerKey.equals("nor");
+    }
+
+    /**
      * Parses a logical operator node
      */
     private FilterNode parseLogicalOperator(String operatorSymbol, Object value) {
@@ -65,16 +74,16 @@ public class FilterParser {
         List<FilterNode> children = new ArrayList<>();
 
         if (operator == FilterOperator.NOT) {
-            // $not takes a single condition (object)
+            // not takes a single condition (object)
             if (value instanceof Map) {
                 @SuppressWarnings("unchecked")
                 Map<String, Object> notCondition = (Map<String, Object>) value;
                 children.add(parse(notCondition));
             } else {
-                throw new IllegalArgumentException("$not operator requires an object value");
+                throw new IllegalArgumentException("not operator requires an object value");
             }
         } else {
-            // $and, $or, $nor take arrays of conditions
+            // and, or, nor take arrays of conditions
             if (!(value instanceof List)) {
                 throw new IllegalArgumentException(operatorSymbol + " operator requires an array value");
             }
@@ -99,7 +108,7 @@ public class FilterParser {
      */
     private FilterNode parseFieldFilter(String fieldName, Object value) {
         if (value instanceof Map) {
-            // Field has operators: { "price": { "$gte": 100, "$lte": 500 } }
+            // Field has operators: { "price": { "gte": 100, "lte": 500 } }
             @SuppressWarnings("unchecked")
             Map<String, Object> operatorMap = (Map<String, Object>) value;
             return new FieldFilterNode(fieldName, operatorMap);

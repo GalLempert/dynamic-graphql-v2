@@ -2,12 +2,11 @@ package sigma.service.write.subentity;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Objects;
 
 /**
  * Represents a sanitized view of an incoming sub-entity payload.
  */
-record SubEntityPayload(String myId, boolean deleted, Map<String, Object> attributes) {
+record SubEntityPayload(Long id, boolean deleted, Map<String, Object> attributes) {
 
     static SubEntityPayload forCreate(String fieldName, Map<?, ?> source) {
         Map<String, Object> normalized = normalize(source);
@@ -15,22 +14,22 @@ record SubEntityPayload(String myId, boolean deleted, Map<String, Object> attrib
             throw new IllegalArgumentException(
                     "Sub-entity create payload for '" + fieldName + "' cannot mark entries as deleted");
         }
-        String myId = extractString(normalized, "myId");
-        return new SubEntityPayload(myId, false, normalized);
+        Long id = extractLong(normalized, "id");
+        return new SubEntityPayload(id, false, normalized);
     }
 
     static SubEntityPayload forModify(String fieldName, Map<?, ?> source) {
         Map<String, Object> normalized = normalize(source);
         boolean isDelete = extractBoolean(normalized, "isDelete", "isDeleted");
-        String myId = extractString(normalized, "myId");
-        return new SubEntityPayload(myId, isDelete, normalized);
+        Long id = extractLong(normalized, "id");
+        return new SubEntityPayload(id, isDelete, normalized);
     }
 
     static SubEntityPayload fromExisting(Map<?, ?> source) {
         Map<String, Object> normalized = normalize(source);
         boolean deleted = extractBoolean(normalized, "isDeleted");
-        String myId = extractString(normalized, "myId");
-        return new SubEntityPayload(myId, deleted, normalized);
+        Long id = extractLong(normalized, "id");
+        return new SubEntityPayload(id, deleted, normalized);
     }
 
     private static Map<String, Object> normalize(Map<?, ?> source) {
@@ -60,14 +59,24 @@ record SubEntityPayload(String myId, boolean deleted, Map<String, Object> attrib
             if (removed instanceof Number number) {
                 return number.intValue() != 0;
             }
-            return Boolean.parseBoolean(Objects.toString(removed));
+            return Boolean.parseBoolean(removed.toString());
         }
         return false;
     }
 
-    private static String extractString(Map<String, Object> map, String key) {
+    private static Long extractLong(Map<String, Object> map, String key) {
         Object removed = removeKey(map, key);
-        return removed != null ? Objects.toString(removed) : null;
+        if (removed == null) {
+            return null;
+        }
+        if (removed instanceof Number number) {
+            return number.longValue();
+        }
+        try {
+            return Long.parseLong(removed.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     private static Object removeKey(Map<String, Object> map, String key) {

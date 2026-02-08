@@ -71,7 +71,7 @@ The application now has a **clean, layered architecture** where business logic i
 │                         ┌────────▼─────────┐                        │
 │                         │  QueryBuilder    │                        │
 │                         │                  │                        │
-│                         │• Build MongoDB   │                        │
+│                         │• Build SQL       │                        │
 │                         │  Query objects   │                        │
 │                         └──────────────────┘                        │
 └───────────────────────────────┬─────────────────────────────────────┘
@@ -80,16 +80,19 @@ The application now has a **clean, layered architecture** where business logic i
 │                      REPOSITORY LAYER                                │
 │                                                                       │
 │  ┌─────────────────────────────────────────────────┐                │
-│  │    DynamicMongoRepository                       │                │
-│  │    • Execute MongoDB queries                    │                │
-│  │    • Change Streams                             │                │
+│  │    DynamicDocumentRepository                    │                │
+│  │    • Execute SQL queries via DatabaseDialect    │                │
+│  │    • Supports PostgreSQL, Oracle, H2            │                │
 │  │    • Returns raw data                           │                │
 │  └────────────────────┬────────────────────────────┘                │
 └────────────────────────┼────────────────────────────────────────────┘
                          ↓
-                  ┌──────────────┐
-                  │   MongoDB    │
-                  └──────────────┘
+          ┌──────────────┴──────────────┐
+          │      DatabaseDialect        │
+          │  ┌─────────┬─────────┬────┐ │
+          │  │PostgreSQL│ Oracle │ H2 │ │
+          │  └─────────┴─────────┴────┘ │
+          └─────────────────────────────┘
                          ↑
                          │
 ┌────────────────────────┴────────────────────────────────────────────┐
@@ -131,15 +134,15 @@ The application now has a **clean, layered architecture** where business logic i
 **Dependencies:**
 - `RequestValidator` - Validate against endpoint configuration
 - `QueryService` - Execute queries
-- `QueryBuilder` - Build MongoDB queries
+- `QueryBuilder` - Build SQL queries (via DatabaseDialect)
 **Reusable:** YES! Used by all protocols
 **Contains:** All business logic, validation, execution
 
 ### 4. Repository Layer (Data Access)
 **Responsibility:** Execute database operations
-**Files:** `DynamicMongoRepository.java`
-**Returns:** Raw MongoDB data
-**Contains:** Only database operations
+**Files:** `DynamicDocumentRepository.java`, `DatabaseDialect` implementations
+**Returns:** Raw document data
+**Contains:** Only database operations, supports PostgreSQL, Oracle, H2
 
 ### 5. Response Layer (Protocol-Specific)
 **Responsibility:** Format DTOs to protocol-specific responses
@@ -156,7 +159,7 @@ The application now has a **clean, layered architecture** where business logic i
 ```
 1. HTTP Request arrives
    POST /api/products
-   { "filter": {"price": {"$gte": 100}}, "options": {"limit": 10} }
+   { "filter": {"price": {"gte": 100}}, "options": {"limit": 10} }
 
 2. RestApiController.handleRestRequest()
    │
@@ -169,16 +172,16 @@ The application now has a **clean, layered architecture** where business logic i
    │     │
    │     ├─ 5. RequestValidator.validate(queryRequest, endpoint)
    │     │     ├─ Checks: Is price filterable?
-   │     │     ├─ Checks: Is $gte operator allowed for price?
+   │     │     ├─ Checks: Is gte operator allowed for price?
    │     │     └─ Returns: ValidationResult.success()
    │     │
    │     ├─ 6. QueryService.execute(queryRequest, collection)
    │     │     │
    │     │     ├─ 7. QueryBuilder.build(queryRequest)
-   │     │     │     └─ Returns: Query with { price: { $gte: 100 } }, limit: 10
+   │     │     │     └─ Returns: SQL predicate via SqlPredicateFactory
    │     │     │
-   │     │     ├─ 8. DynamicMongoRepository.findWithQuery(collection, query)
-   │     │     │     └─ Executes: MongoDB query
+   │     │     ├─ 8. DynamicDocumentRepository.findWithQuery(collection, query)
+   │     │     │     └─ Executes: SQL query (PostgreSQL/Oracle/H2)
    │     │     │     └─ Returns: List<Document>
    │     │     │
    │     │     └─ Returns: DocumentListResponse(documents)
@@ -322,8 +325,20 @@ src/main/java/sigma/
 │       ├── SequenceResponse.java
 │       └── ErrorResponse.java
 │
-└── persistence/repository/
-    └── DynamicMongoRepository.java
+└── persistence/
+    ├── repository/
+    │   └── DynamicDocumentRepository.java
+    ├── dialect/
+    │   ├── DatabaseDialect.java (interface)
+    │   ├── DatabaseType.java (enum)
+    │   ├── PostgreSqlDialect.java
+    │   ├── OracleDialect.java
+    │   ├── H2Dialect.java
+    │   └── DatabaseDialectFactory.java
+    ├── config/
+    │   ├── DatabaseDialectConfig.java
+    │   └── DatabaseInitializer.java
+    └── SqlPredicateFactory.java
 ```
 
 ---

@@ -8,18 +8,18 @@ import java.util.Map;
  */
 class SubEntityRecord {
 
-    private final String myId;
+    private final Long id;
     private boolean deleted;
     private final Map<String, Object> attributes;
 
-    SubEntityRecord(String myId, boolean deleted, Map<String, Object> attributes) {
-        this.myId = myId;
+    SubEntityRecord(Long id, boolean deleted, Map<String, Object> attributes) {
+        this.id = id;
         this.deleted = deleted;
         this.attributes = new LinkedHashMap<>(attributes);
     }
 
-    String getMyId() {
-        return myId;
+    Long getId() {
+        return id;
     }
 
     boolean isDeleted() {
@@ -40,7 +40,7 @@ class SubEntityRecord {
 
     Map<String, Object> toDocument() {
         Map<String, Object> document = new LinkedHashMap<>(attributes);
-        document.put("myId", myId);
+        document.put("id", id);
         document.put("isDeleted", deleted);
         return document;
     }

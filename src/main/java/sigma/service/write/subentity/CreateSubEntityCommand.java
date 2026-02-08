@@ -7,10 +7,10 @@ import java.util.Map;
  */
 class CreateSubEntityCommand implements SubEntityCommand {
 
-    private final String requestedId;
+    private final Long requestedId;
     private final Map<String, Object> attributes;
 
-    CreateSubEntityCommand(String requestedId, Map<String, Object> attributes) {
+    CreateSubEntityCommand(Long requestedId, Map<String, Object> attributes) {
         this.requestedId = requestedId;
         this.attributes = attributes;
     }

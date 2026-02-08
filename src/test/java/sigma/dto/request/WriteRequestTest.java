@@ -65,7 +65,7 @@ class WriteRequestTest {
     @Test
     void testUpdateRequestReturnsNullForValidation() {
         // Given: UpdateRequest (partial update)
-        Map<String, Object> filter = Map.of("_id", "123");
+        Map<String, Object> filter = Map.of("id", "123");
         Map<String, Object> updates = Map.of("age", 31);
         
         UpdateRequest request = new UpdateRequest(filter, updates, "req-123", false);
@@ -117,7 +117,7 @@ class WriteRequestTest {
         );
         
         WriteRequest updateRequest = new UpdateRequest(
-            Map.of("_id", "123"),
+            Map.of("id", "123"),
             Map.of("age", 30),
             "req-3",
             false

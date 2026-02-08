@@ -1,18 +1,19 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
- * Greater than or equal operator: $gte
+ * Greater than or equal operator: gte
  */
 public class GreaterThanEqualOperator extends ComparisonOperator {
 
     public GreaterThanEqualOperator() {
-        super("$gte");
+        super("gte");
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
-        return Criteria.where(fieldName).gte(value);
+    public SqlPredicate apply(String fieldName, Object value) {
+        return SqlPredicateFactory.jsonGreaterThanOrEqual(fieldName, value);
     }
 }

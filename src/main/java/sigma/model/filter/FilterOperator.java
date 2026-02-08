@@ -38,7 +38,7 @@ public enum FilterOperator {
 
     static {
         for (FilterOperator op : values()) {
-            OPERATOR_MAP.put(op.getMongoOperator(), op);
+            OPERATOR_MAP.put(op.getOperatorSymbol(), op);
             OPERATOR_MAP.put(op.name().toLowerCase(), op);
         }
     }
@@ -51,8 +51,11 @@ public enum FilterOperator {
         return strategy;
     }
 
-    public String getMongoOperator() {
-        return strategy.getMongoOperator();
+    /**
+     * Returns the operator symbol (e.g., "eq", "gt")
+     */
+    public String getOperatorSymbol() {
+        return strategy.getOperator();
     }
 
     public boolean isLogical() {
@@ -60,7 +63,7 @@ public enum FilterOperator {
     }
 
     /**
-     * Looks up an operator by its MongoDB symbol or enum name
+     * Looks up an operator by its symbol or enum name
      */
     public static FilterOperator fromString(String operator) {
         if (operator == null) {
@@ -72,7 +75,7 @@ public enum FilterOperator {
             return op;
         }
 
-        // Try exact match with MongoDB operator
+        // Try exact match with operator symbol
         op = OPERATOR_MAP.get(operator);
         if (op != null) {
             return op;

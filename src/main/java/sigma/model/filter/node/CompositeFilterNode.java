@@ -1,7 +1,7 @@
 package sigma.model.filter.node;
 
 import sigma.model.filter.FilterConfig;
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,7 +10,7 @@ import java.util.stream.Collectors;
 /**
  * Represents a composite filter with multiple field conditions
  * This is used when a filter map contains multiple keys (implicitly ANDed)
- * Example: { "category": "electronics", "price": { "$gt": 100 } }
+ * Example: { "category": "electronics", "price": { "gt": 100 } }
  */
 public class CompositeFilterNode extends FilterNode {
 
@@ -21,21 +21,21 @@ public class CompositeFilterNode extends FilterNode {
     }
 
     @Override
-    public Criteria toCriteria() {
+    public SqlPredicate toPredicate() {
         if (children.isEmpty()) {
-            return new Criteria();
+            return new SqlPredicate("1=1");
         }
 
         if (children.size() == 1) {
-            return children.get(0).toCriteria();
+            return children.get(0).toPredicate();
         }
 
         // Multiple children are implicitly ANDed
-        List<Criteria> criteriaList = children.stream()
-                .map(FilterNode::toCriteria)
+        List<SqlPredicate> predicates = children.stream()
+                .map(FilterNode::toPredicate)
                 .collect(Collectors.toList());
 
-        return new Criteria().andOperator(criteriaList.toArray(new Criteria[0]));
+        return SqlPredicate.and(predicates.toArray(new SqlPredicate[0]));
     }
 
     @Override

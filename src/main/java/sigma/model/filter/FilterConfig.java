@@ -9,14 +9,14 @@ import java.util.Map;
  * Configuration for filters available on a specific endpoint
  * Defines which fields can be filtered and what operators are allowed
  *
- * NOTE: Primary key (_id) is ALWAYS filterable with $eq operator,
+ * NOTE: Primary key (id) is ALWAYS filterable with eq operator,
  * regardless of configuration. This ensures single document operations
  * are always possible.
  */
 @Getter
 public class FilterConfig {
 
-    private static final String MONGODB_ID_FIELD = "_id";
+    private static final String ID_FIELD = "id";
 
     private final Map<String, List<FilterOperator>> fieldOperators;
     private final boolean enabled;
@@ -28,11 +28,11 @@ public class FilterConfig {
 
     /**
      * Checks if a field is filterable
-     * PRIMARY KEY (_id) is ALWAYS filterable
+     * PRIMARY KEY (id) is ALWAYS filterable
      */
     public boolean isFieldFilterable(String fieldName) {
         // Primary key is always filterable
-        if (MONGODB_ID_FIELD.equals(fieldName)) {
+        if (ID_FIELD.equals(fieldName)) {
             return true;
         }
         return fieldOperators.containsKey(fieldName);
@@ -40,11 +40,11 @@ public class FilterConfig {
 
     /**
      * Checks if an operator is allowed for a given field
-     * PRIMARY KEY (_id) always allows $eq operator
+     * PRIMARY KEY (id) always allows eq operator
      */
     public boolean isOperatorAllowed(String fieldName, FilterOperator operator) {
-        // Primary key always allows $eq (equals) operator
-        if (MONGODB_ID_FIELD.equals(fieldName) && operator == FilterOperator.EQ) {
+        // Primary key always allows eq (equals) operator
+        if (ID_FIELD.equals(fieldName) && operator == FilterOperator.EQ) {
             return true;
         }
 
@@ -54,11 +54,11 @@ public class FilterConfig {
 
     /**
      * Gets allowed operators for a field
-     * PRIMARY KEY (_id) always returns $eq operator
+     * PRIMARY KEY (id) always returns eq operator
      */
     public List<FilterOperator> getAllowedOperators(String fieldName) {
-        // Primary key always allows $eq operator
-        if (MONGODB_ID_FIELD.equals(fieldName)) {
+        // Primary key always allows eq operator
+        if (ID_FIELD.equals(fieldName)) {
             return List.of(FilterOperator.EQ);
         }
         return fieldOperators.get(fieldName);

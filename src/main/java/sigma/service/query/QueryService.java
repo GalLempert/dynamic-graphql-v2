@@ -3,7 +3,7 @@ package sigma.service.query;
 import sigma.dto.request.QueryRequest;
 import sigma.dto.response.QueryResponse;
 import sigma.model.Endpoint;
-import sigma.persistence.repository.DynamicMongoRepository;
+import sigma.persistence.repository.DynamicDocumentRepository;
 import sigma.service.query.strategy.QueryExecutionStrategyFactory;
 import io.micrometer.observation.annotation.Observed;
 import org.slf4j.Logger;
@@ -11,24 +11,22 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 /**
- * Service layer for executing queries against MongoDB
+ * Service layer for executing queries against PostgreSQL
  * Single Responsibility: Query execution and orchestration
- *
- * Renamed from GraphQLEngine to better reflect its purpose
  */
 @Service
 public class QueryService {
 
     private static final Logger logger = LoggerFactory.getLogger(QueryService.class);
 
-    private final DynamicMongoRepository mongoRepository;
+    private final DynamicDocumentRepository postgresRepository;
     private final QueryBuilder queryBuilder;
     private final QueryExecutionStrategyFactory strategyFactory;
 
-    public QueryService(DynamicMongoRepository mongoRepository,
+    public QueryService(DynamicDocumentRepository postgresRepository,
                         QueryBuilder queryBuilder,
                         QueryExecutionStrategyFactory strategyFactory) {
-        this.mongoRepository = mongoRepository;
+        this.postgresRepository = postgresRepository;
         this.queryBuilder = queryBuilder;
         this.strategyFactory = strategyFactory;
     }
@@ -37,8 +35,8 @@ public class QueryService {
      * Provides access to repository for polymorphic request execution
      * Used by QueryRequest implementations via Template Method pattern
      */
-    public DynamicMongoRepository getRepository() {
-        return mongoRepository;
+    public DynamicDocumentRepository getRepository() {
+        return postgresRepository;
     }
 
     /**
@@ -54,7 +52,7 @@ public class QueryService {
      * Uses polymorphism - ZERO switch statements!
      *
      * @param request The query request
-     * @param collectionName The collection to query
+     * @param endpoint The endpoint configuration
      * @return Query response
      */
     @Observed(name = "query.execution", contextualName = "query.execute")

@@ -1,7 +1,7 @@
 package sigma.model.filter.node;
 
 import sigma.model.filter.FilterConfig;
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 import java.util.List;
 
@@ -12,9 +12,9 @@ import java.util.List;
 public abstract class FilterNode {
 
     /**
-     * Converts this node to MongoDB Criteria
+     * Converts this node to a SQL predicate for PostgreSQL JSONB queries
      */
-    public abstract Criteria toCriteria();
+    public abstract SqlPredicate toPredicate();
 
     /**
      * Validates this node against the filter configuration

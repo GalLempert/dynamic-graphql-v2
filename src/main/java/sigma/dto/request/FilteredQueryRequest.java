@@ -4,14 +4,14 @@ import sigma.dto.response.DocumentListResponse;
 import sigma.dto.response.QueryResponse;
 import sigma.model.Endpoint;
 import sigma.model.filter.FilterRequest;
+import sigma.model.filter.FilterResult;
 import sigma.service.query.QueryBuilder;
 import sigma.service.query.QueryService;
 import sigma.service.validation.RequestValidator;
 import lombok.Getter;
-import org.bson.Document;
-import org.springframework.data.mongodb.core.query.Query;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Request for filtered queries with optional sorting, pagination, and projection
@@ -31,7 +31,7 @@ public class FilteredQueryRequest implements QueryRequest {
     }
 
     @Override
-    public Query buildQuery(QueryBuilder queryBuilder) {
+    public FilterResult buildQuery(QueryBuilder queryBuilder) {
         return queryBuilder.getFilterTranslator().translate(filterRequest);
     }
 
@@ -42,8 +42,15 @@ public class FilteredQueryRequest implements QueryRequest {
 
     @Override
     public QueryResponse execute(QueryService service, String collectionName) {
-        Query query = buildQuery(service.getQueryBuilder());
-        List<Document> documents = service.getRepository().findWithQuery(collectionName, query);
+        FilterResult filterResult = buildQuery(service.getQueryBuilder());
+        List<Map<String, Object>> documents = service.getRepository().findWithQuery(
+                collectionName,
+                filterResult.getWhereClause(),
+                filterResult.getOrderByClause(),
+                filterResult.getLimit(),
+                filterResult.getOffset(),
+                filterResult.getParameters()
+        );
         return new DocumentListResponse(documents);
     }
 

@@ -1,24 +1,25 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 import java.util.List;
 
 /**
- * In array operator: $in
+ * In array operator: in
  */
 public class InOperator extends ComparisonOperator {
 
     public InOperator() {
-        super("$in");
+        super("in");
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
+    public SqlPredicate apply(String fieldName, Object value) {
         if (value instanceof List) {
-            return Criteria.where(fieldName).in((List<?>) value);
+            return SqlPredicateFactory.jsonIn(fieldName, (List<?>) value);
         }
-        throw new IllegalArgumentException("$in operator requires a list value");
+        throw new IllegalArgumentException("in operator requires a list value");
     }
 
     @Override

@@ -1,4 +1,4 @@
 /**
- * MongoDB entities
+ * PostgreSQL entities
  */
 package sigma.persistence.entity;

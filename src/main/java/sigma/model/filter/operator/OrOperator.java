@@ -1,23 +1,23 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 import java.util.List;
 
 /**
- * Logical OR operator: $or
+ * Logical OR operator: or
  */
 public class OrOperator extends LogicalOperator {
 
     public OrOperator() {
-        super("$or");
+        super("or");
     }
 
     @Override
-    public Criteria applyCriteria(List<Criteria> criteriaList) {
-        if (criteriaList.isEmpty()) {
-            return new Criteria();
+    public SqlPredicate applyPredicates(List<SqlPredicate> predicates) {
+        if (predicates.isEmpty()) {
+            return new SqlPredicate("1=0");
         }
-        return new Criteria().orOperator(criteriaList.toArray(new Criteria[0]));
+        return SqlPredicate.or(predicates.toArray(new SqlPredicate[0]));
     }
 }

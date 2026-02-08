@@ -7,16 +7,16 @@ import java.util.Map;
  */
 class UpdateSubEntityCommand implements SubEntityCommand {
 
-    private final String myId;
+    private final Long id;
     private final Map<String, Object> attributes;
 
-    UpdateSubEntityCommand(String myId, Map<String, Object> attributes) {
-        this.myId = myId;
+    UpdateSubEntityCommand(Long id, Map<String, Object> attributes) {
+        this.id = id;
         this.attributes = attributes;
     }
 
     @Override
     public void apply(SubEntityCollection collection) {
-        collection.update(myId, attributes);
+        collection.update(id, attributes);
     }
 }

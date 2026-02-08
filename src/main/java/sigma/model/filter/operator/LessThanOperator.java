@@ -1,18 +1,19 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
- * Less than operator: $lt
+ * Less than operator: lt
  */
 public class LessThanOperator extends ComparisonOperator {
 
     public LessThanOperator() {
-        super("$lt");
+        super("lt");
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
-        return Criteria.where(fieldName).lt(value);
+    public SqlPredicate apply(String fieldName, Object value) {
+        return SqlPredicateFactory.jsonLessThan(fieldName, value);
     }
 }

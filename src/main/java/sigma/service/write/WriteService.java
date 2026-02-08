@@ -1,18 +1,15 @@
 package sigma.service.write;
 
-import com.mongodb.client.result.DeleteResult;
-import com.mongodb.client.result.UpdateResult;
 import sigma.dto.request.*;
 import sigma.dto.response.*;
 import sigma.filter.FilterTranslator;
 import sigma.model.DynamicDocument;
 import sigma.model.Endpoint;
-import sigma.persistence.repository.DynamicMongoRepository;
+import sigma.model.filter.FilterResult;
+import sigma.persistence.repository.DynamicDocumentRepository;
 import sigma.service.write.subentity.SubEntityProcessor;
-import org.bson.Document;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,13 +31,13 @@ public class WriteService {
 
     private static final Logger logger = LoggerFactory.getLogger(WriteService.class);
 
-    private final DynamicMongoRepository repository;
+    private final DynamicDocumentRepository repository;
     private final FilterTranslator filterTranslator;
     private final SubEntityProcessor subEntityProcessor;
     private final DocumentChangeDetector documentChangeDetector;
     private final ThreadLocal<Endpoint> endpointContext = new ThreadLocal<>();
 
-    public WriteService(DynamicMongoRepository repository,
+    public WriteService(DynamicDocumentRepository repository,
                         FilterTranslator filterTranslator,
                         SubEntityProcessor subEntityProcessor,
                         DocumentChangeDetector documentChangeDetector) {
@@ -62,7 +59,7 @@ public class WriteService {
      * Executes a write request using endpoint metadata for sub-entity handling
      */
     public WriteResponse execute(WriteRequest request, Endpoint endpoint) {
-        logger.info("Executing {} operation on endpoint: {} -> collection: {}",
+        logger.info("Executing {} operation on endpoint: {} -> table: {}",
                 request.getType(), endpoint.getName(), endpoint.getDatabaseCollection());
         endpointContext.set(endpoint);
         try {
@@ -75,107 +72,138 @@ public class WriteService {
     /**
      * Executes CREATE operation
      */
-    public WriteResponse executeCreate(CreateRequest request, String collectionName) {
+    public WriteResponse executeCreate(CreateRequest request, String tableName) {
         Endpoint endpoint = requireEndpointContext();
         List<DynamicDocument> documents = request.getDocuments().stream()
                 .map(doc -> {
                     Map<String, Object> sanitized = sanitizeDocumentForWrite(doc);
                     Map<String, Object> processed = subEntityProcessor.prepareForCreate(sanitized, endpoint.getSubEntities());
-                    DynamicDocument dynamicDoc = new DynamicDocument(processed);
+                    DynamicDocument dynamicDoc = new DynamicDocument(tableName, processed);
                     dynamicDoc.setLatestRequestId(request.getRequestId());
                     dynamicDoc.setDeleted(false);
                     return dynamicDoc;
                 })
                 .collect(Collectors.toList());
 
-        List<String> insertedIds;
+        List<Long> insertedIds;
         if (request.isBulk()) {
-            insertedIds = repository.insertMany(collectionName, documents);
+            insertedIds = repository.insertMany(tableName, documents);
         } else {
-            insertedIds = List.of(repository.insertOne(collectionName, documents.get(0)));
+            insertedIds = List.of(repository.insertOne(tableName, documents.get(0)));
         }
 
-        List<Map<String, Object>> responseDocs = loadDocumentsByIds(collectionName, insertedIds);
+        List<Map<String, Object>> responseDocs = repository.findByIds(tableName, insertedIds);
         String message = request.isBulk()
                 ? "Documents created successfully."
                 : "Document created successfully.";
-        return new CreateResponse(insertedIds, responseDocs, message);
+        List<String> stringIds = insertedIds.stream()
+                .map(String::valueOf)
+                .collect(Collectors.toList());
+        return new CreateResponse(stringIds, responseDocs, message);
     }
 
     /**
      * Executes UPDATE operation
      */
-    public WriteResponse executeUpdate(UpdateRequest request, String collectionName) {
+    public WriteResponse executeUpdate(UpdateRequest request, String tableName) {
         Endpoint endpoint = requireEndpointContext();
 
         sigma.model.filter.FilterRequest filterRequest =
                 new sigma.model.filter.FilterRequest(request.getFilter(), null);
-        Query query = filterTranslator.translate(filterRequest);
+        FilterResult filterResult = filterTranslator.translate(filterRequest);
 
         Map<String, Object> updates = sanitizeDocumentForWrite(request.getUpdates());
-        List<Document> matchingDocuments = repository.findWithQuery(collectionName, query);
+        List<DynamicDocument> matchingDocuments = repository.findDocuments(
+                tableName,
+                filterResult.getWhereClause(),
+                filterResult.getParameters(),
+                null
+        );
 
         if (matchingDocuments.isEmpty()) {
             return new UpdateResponse(0, 0, List.of(), "No documents matched the provided filter.");
         }
 
         applySubEntityUpdates(endpoint.getSubEntities(), updates, request.isUpdateMultiple(),
-                () -> loadSingleDocument(collectionName, query));
+                () -> loadSingleDocument(tableName, filterResult));
+
+        List<Map<String, Object>> matchingMaps = matchingDocuments.stream()
+                .map(DynamicDocument::toMap)
+                .collect(Collectors.toList());
 
         DocumentChangeResult changeResult =
-                documentChangeDetector.evaluate(matchingDocuments, updates);
+                documentChangeDetector.evaluate(matchingMaps, updates);
 
         if (!changeResult.hasChanges()) {
-            List<Map<String, Object>> unchanged = convertDocuments(matchingDocuments);
-            return new UpdateResponse(matchingDocuments.size(), 0, unchanged,
+            return new UpdateResponse(matchingDocuments.size(), 0, matchingMaps,
                     "No changes detected; documents remain unchanged.");
         }
 
         Map<String, Object> effectiveUpdates = new LinkedHashMap<>(updates);
         effectiveUpdates.put("latestRequestId", request.getRequestId());
 
-        UpdateResult result = repository.update(collectionName, query, effectiveUpdates, request.isUpdateMultiple());
+        int modifiedCount = repository.update(
+                tableName,
+                filterResult.getWhereClause(),
+                effectiveUpdates,
+                filterResult.getParameters(),
+                request.isUpdateMultiple()
+        );
 
-        List<Object> ids = extractIds(matchingDocuments);
-        List<Map<String, Object>> updatedDocuments = convertDocuments(
-                repository.findByIds(collectionName, ids));
+        List<Long> ids = matchingDocuments.stream()
+                .map(DynamicDocument::getId)
+                .collect(Collectors.toList());
+        List<Map<String, Object>> updatedDocuments = repository.findByIds(tableName, ids);
 
-        return new UpdateResponse(result.getMatchedCount(), result.getModifiedCount(), updatedDocuments,
+        return new UpdateResponse(matchingDocuments.size(), modifiedCount, updatedDocuments,
                 "Documents updated successfully.");
     }
 
     /**
      * Executes DELETE operation (logical delete)
      */
-    public WriteResponse executeDelete(DeleteRequest request, String collectionName) {
+    public WriteResponse executeDelete(DeleteRequest request, String tableName) {
 
         sigma.model.filter.FilterRequest filterRequest =
                 new sigma.model.filter.FilterRequest(request.getFilter(), null);
-        Query query = filterTranslator.translate(filterRequest);
+        FilterResult filterResult = filterTranslator.translate(filterRequest);
 
-        List<Document> documentsBeforeDelete = repository.findWithQuery(collectionName, query);
+        List<DynamicDocument> documentsBeforeDelete = repository.findDocuments(
+                tableName,
+                filterResult.getWhereClause(),
+                filterResult.getParameters(),
+                null
+        );
+
         if (documentsBeforeDelete.isEmpty()) {
             return new DeleteResponse(0, List.of(), "No documents matched the provided filter.");
         }
 
-        DeleteResult result = repository.delete(collectionName, query, request.isDeleteMultiple(), request.getRequestId());
+        int deletedCount = repository.delete(
+                tableName,
+                filterResult.getWhereClause(),
+                filterResult.getParameters(),
+                request.isDeleteMultiple(),
+                request.getRequestId()
+        );
 
-        List<Object> ids = extractIds(documentsBeforeDelete);
-        List<Map<String, Object>> deletedDocuments = convertDocuments(
-                repository.findByIds(collectionName, ids));
+        List<Long> ids = documentsBeforeDelete.stream()
+                .map(DynamicDocument::getId)
+                .collect(Collectors.toList());
+        List<Map<String, Object>> deletedDocuments = repository.findByIds(tableName, ids);
 
-        return new DeleteResponse(result.getDeletedCount(), deletedDocuments, "Documents marked as deleted.");
+        return new DeleteResponse(deletedCount, deletedDocuments, "Documents marked as deleted.");
     }
 
     /**
      * Executes UPSERT operation
      */
-    public WriteResponse executeUpsert(UpsertRequest request, String collectionName) {
+    public WriteResponse executeUpsert(UpsertRequest request, String tableName) {
         Endpoint endpoint = requireEndpointContext();
 
         sigma.model.filter.FilterRequest filterRequest =
                 new sigma.model.filter.FilterRequest(request.getFilter(), null);
-        Query query = filterTranslator.translate(filterRequest);
+        FilterResult filterResult = filterTranslator.translate(filterRequest);
 
         Map<String, Object> document = sanitizeDocumentForWrite(request.getDocument());
         document.put("latestRequestId", request.getRequestId());
@@ -183,84 +211,126 @@ public class WriteService {
         Set<String> subEntities = endpoint.getSubEntities();
 
         if (!subEntities.isEmpty()) {
-            List<Document> existingDocs = repository.findWithQuery(collectionName, query);
+            List<DynamicDocument> existingDocs = repository.findDocuments(
+                    tableName,
+                    filterResult.getWhereClause(),
+                    filterResult.getParameters(),
+                    1
+            );
+
             if (!existingDocs.isEmpty()) {
-                Document existingDoc = ensureSingleDocument(existingDocs);
+                DynamicDocument existingDoc = existingDocs.get(0);
+                Map<String, Object> existingMap = existingDoc.toMap();
                 Map<String, Object> updates = new LinkedHashMap<>(document);
-                subEntityProcessor.applyUpsertUpdate(updates, subEntities, existingDoc);
+                subEntityProcessor.applyUpsertUpdate(updates, subEntities, existingMap);
 
                 DocumentChangeResult changeResult =
-                        documentChangeDetector.evaluate(List.of(existingDoc), updates);
+                        documentChangeDetector.evaluate(List.of(existingMap), updates);
 
-                String documentId = extractDocumentId(existingDoc);
+                String documentId = String.valueOf(existingDoc.getId());
 
                 if (!changeResult.hasChanges()) {
                     return new UpsertResponse(false, documentId, 1, 0,
-                            convertDocuments(List.of(existingDoc)),
+                            List.of(existingMap),
                             "No changes detected; document remains unchanged.");
                 }
 
                 Map<String, Object> effectiveUpdates = new LinkedHashMap<>(updates);
                 effectiveUpdates.put("latestRequestId", request.getRequestId());
 
-                UpdateResult updateResult = repository.update(collectionName, query, effectiveUpdates, false);
+                repository.update(
+                        tableName,
+                        filterResult.getWhereClause(),
+                        effectiveUpdates,
+                        filterResult.getParameters(),
+                        false
+                );
 
-                List<Map<String, Object>> updatedDocuments = convertDocuments(
-                        repository.findByIds(collectionName, List.of(documentId)));
+                List<Map<String, Object>> updatedDocuments = repository.findByIds(tableName, List.of(existingDoc.getId()));
 
-                return new UpsertResponse(false, documentId, updateResult.getMatchedCount(), updateResult.getModifiedCount(),
+                return new UpsertResponse(false, documentId, 1L, 1L,
                         updatedDocuments, "Document updated successfully.");
             }
 
             Map<String, Object> processed = subEntityProcessor.prepareForUpsertCreate(document, subEntities);
-            UpdateResult result = repository.upsert(collectionName, query, processed);
+            Map<String, Object> result = repository.upsert(
+                    tableName,
+                    filterResult.getWhereClause(),
+                    processed,
+                    filterResult.getParameters()
+            );
 
-            boolean wasInserted = result.getUpsertedId() != null;
+            boolean wasInserted = result.containsKey("upsertedId");
             String documentId = wasInserted
-                    ? result.getUpsertedId().asObjectId().getValue().toString()
+                    ? String.valueOf(result.get("upsertedId"))
                     : null;
 
-            List<Map<String, Object>> documents = wasInserted
-                    ? convertDocuments(repository.findByIds(collectionName, List.of(documentId)))
+            List<Map<String, Object>> documents = wasInserted && documentId != null
+                    ? repository.findByIds(tableName, List.of(Long.parseLong(documentId)))
                     : List.of();
 
             String message = wasInserted
                     ? "Document inserted successfully."
                     : "Document updated successfully.";
 
-            return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount(),
+            long matchedCount = result.containsKey("matchedCount") ? ((Number) result.get("matchedCount")).longValue() : 0;
+            long modifiedCount = result.containsKey("modifiedCount") ? ((Number) result.get("modifiedCount")).longValue() : 0;
+
+            return new UpsertResponse(wasInserted, documentId, matchedCount, modifiedCount,
                     documents, message);
         }
 
         document.put("isDeleted", false);
 
-        List<Document> existingDocuments = repository.findWithQuery(collectionName, query);
-        String existingDocumentId = extractDocumentIdFromQuery(existingDocuments);
+        List<DynamicDocument> existingDocuments = repository.findDocuments(
+                tableName,
+                filterResult.getWhereClause(),
+                filterResult.getParameters(),
+                1
+        );
+        String existingDocumentId = existingDocuments.isEmpty()
+                ? null
+                : String.valueOf(existingDocuments.get(0).getId());
 
-        UpdateResult result = repository.upsert(collectionName, query, document);
+        Map<String, Object> result = repository.upsert(
+                tableName,
+                filterResult.getWhereClause(),
+                document,
+                filterResult.getParameters()
+        );
 
-        boolean wasInserted = result.getUpsertedId() != null;
+        boolean wasInserted = result.containsKey("upsertedId");
 
         String documentId;
         List<Map<String, Object>> documents;
 
         if (wasInserted) {
-            documentId = result.getUpsertedId().asObjectId().getValue().toString();
-            documents = convertDocuments(repository.findByIds(collectionName, List.of(documentId)));
+            documentId = String.valueOf(result.get("upsertedId"));
+            documents = repository.findByIds(tableName, List.of(Long.parseLong(documentId)));
         } else if (existingDocumentId != null) {
             documentId = existingDocumentId;
-            documents = convertDocuments(repository.findByIds(collectionName, List.of(documentId)));
+            documents = repository.findByIds(tableName, List.of(Long.parseLong(documentId)));
         } else {
-            List<Document> refreshed = repository.findWithQuery(collectionName, query);
-            documentId = extractDocumentIdFromQuery(refreshed);
-            documents = convertDocuments(refreshed);
+            List<DynamicDocument> refreshed = repository.findDocuments(
+                    tableName,
+                    filterResult.getWhereClause(),
+                    filterResult.getParameters(),
+                    1
+            );
+            documentId = refreshed.isEmpty() ? null : String.valueOf(refreshed.get(0).getId());
+            documents = refreshed.stream()
+                    .map(DynamicDocument::toMap)
+                    .collect(Collectors.toList());
         }
 
         String message = wasInserted
                 ? "Document inserted successfully."
                 : "Document updated successfully.";
 
-        return new UpsertResponse(wasInserted, documentId, result.getMatchedCount(), result.getModifiedCount(),
+        long matchedCount = result.containsKey("matchedCount") ? ((Number) result.get("matchedCount")).longValue() : 0;
+        long modifiedCount = result.containsKey("modifiedCount") ? ((Number) result.get("modifiedCount")).longValue() : 0;
+
+        return new UpsertResponse(wasInserted, documentId, matchedCount, modifiedCount,
                 documents, message);
     }
 
@@ -283,67 +353,30 @@ public class WriteService {
         return sanitized;
     }
 
-    private String extractDocumentId(Document document) {
-        if (document == null) {
-            return null;
-        }
-        Object id = document.get("_id");
-        return id != null ? id.toString() : null;
-    }
-
-    private String extractDocumentIdFromQuery(List<Document> documents) {
-        if (documents == null || documents.isEmpty()) {
-            return null;
-        }
-        return extractDocumentId(documents.get(0));
-    }
-
     private void applySubEntityUpdates(Set<String> subEntities,
                                        Map<String, Object> updates,
                                        boolean updateMultiple,
-                                       Supplier<Document> existingDocumentSupplier) {
+                                       Supplier<Map<String, Object>> existingDocumentSupplier) {
         subEntityProcessor.applyUpdateOperations(updates, subEntities, updateMultiple, existingDocumentSupplier);
     }
 
-    private Document loadSingleDocument(String collectionName, Query query) {
-        List<Document> documents = repository.findWithQuery(collectionName, query);
+    private Map<String, Object> loadSingleDocument(String tableName, FilterResult filterResult) {
+        List<DynamicDocument> documents = repository.findDocuments(
+                tableName,
+                filterResult.getWhereClause(),
+                filterResult.getParameters(),
+                2
+        );
         return ensureSingleDocument(documents);
     }
 
-    private Document ensureSingleDocument(List<Document> documents) {
+    private Map<String, Object> ensureSingleDocument(List<DynamicDocument> documents) {
         if (documents == null || documents.isEmpty()) {
             throw new IllegalArgumentException("No document found matching filter for sub-entity update");
         }
         if (documents.size() > 1) {
             throw new IllegalArgumentException("Multiple documents match filter; cannot apply sub-entity operations safely");
         }
-        return documents.get(0);
-    }
-
-    private List<Map<String, Object>> convertDocuments(List<Document> documents) {
-        if (documents == null || documents.isEmpty()) {
-            return List.of();
-        }
-        return documents.stream()
-                .filter(Objects::nonNull)
-                .map(doc -> new LinkedHashMap<String, Object>(doc))
-                .collect(Collectors.toList());
-    }
-
-    private List<Map<String, Object>> loadDocumentsByIds(String collectionName, List<String> ids) {
-        if (ids == null || ids.isEmpty()) {
-            return List.of();
-        }
-        List<Object> objectIds = ids.stream()
-                .map(id -> (Object) id)
-                .collect(Collectors.toList());
-        return convertDocuments(repository.findByIds(collectionName, objectIds));
-    }
-
-    private List<Object> extractIds(List<Document> documents) {
-        return documents.stream()
-                .map(doc -> doc.get("_id"))
-                .filter(Objects::nonNull)
-                .collect(Collectors.toList());
+        return documents.get(0).toMap();
     }
 }

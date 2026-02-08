@@ -11,11 +11,11 @@ import java.util.Map;
 class SubEntityCollection {
 
     private final String fieldName;
-    private final Map<String, SubEntityRecord> records;
+    private final Map<Long, SubEntityRecord> records;
     private final SubEntityIdGenerator idGenerator;
 
     private SubEntityCollection(String fieldName,
-                                Map<String, SubEntityRecord> records,
+                                Map<Long, SubEntityRecord> records,
                                 SubEntityIdGenerator idGenerator) {
         this.fieldName = fieldName;
         this.records = records;
@@ -29,7 +29,7 @@ class SubEntityCollection {
     static SubEntityCollection fromExisting(String fieldName,
                                             Object currentValue,
                                             SubEntityIdGenerator idGenerator) {
-        Map<String, SubEntityRecord> currentRecords = new LinkedHashMap<>();
+        Map<Long, SubEntityRecord> currentRecords = new LinkedHashMap<>();
         SubEntityCollection collection = new SubEntityCollection(fieldName, currentRecords, idGenerator);
 
         if (currentValue == null) {
@@ -50,16 +50,16 @@ class SubEntityCollection {
         return collection;
     }
 
-    void addNew(String requestedId, Map<String, Object> attributes) {
-        String identifier = resolveIdentifier(requestedId);
+    void addNew(Long requestedId, Map<String, Object> attributes) {
+        Long identifier = resolveIdentifier(requestedId);
         ensureIdAvailable(identifier);
         SubEntityRecord record = new SubEntityRecord(identifier, false, attributes);
         records.put(identifier, record);
     }
 
     void addExisting(SubEntityPayload payload) {
-        String identifier = payload.myId();
-        if (identifier == null || identifier.isBlank() || records.containsKey(identifier)) {
+        Long identifier = payload.id();
+        if (identifier == null || records.containsKey(identifier)) {
             identifier = resolveIdentifier(null);
         }
         SubEntityRecord record = new SubEntityRecord(identifier, payload.deleted(), payload.attributes());
@@ -70,13 +70,13 @@ class SubEntityCollection {
         command.apply(this);
     }
 
-    void update(String id, Map<String, Object> attributes) {
+    void update(Long id, Map<String, Object> attributes) {
         SubEntityRecord record = getActiveRecord(id);
         record.updateAttributes(attributes);
         record.markActive();
     }
 
-    void delete(String id) {
+    void delete(Long id) {
         SubEntityRecord record = getActiveRecord(id);
         record.markDeleted();
     }
@@ -89,25 +89,25 @@ class SubEntityCollection {
         return result;
     }
 
-    private SubEntityRecord getActiveRecord(String id) {
+    private SubEntityRecord getActiveRecord(Long id) {
         SubEntityRecord record = records.get(id);
         if (record == null || record.isDeleted()) {
             throw new IllegalArgumentException(
-                    "Sub-entity with myId '" + id + "' does not exist or is deleted for field '" + fieldName + "'");
+                    "Sub-entity with id '" + id + "' does not exist or is deleted for field '" + fieldName + "'");
         }
         return record;
     }
 
-    private void ensureIdAvailable(String id) {
+    private void ensureIdAvailable(Long id) {
         if (records.containsKey(id)) {
             throw new IllegalArgumentException(
-                    "Sub-entity with myId '" + id + "' already exists for field '" + fieldName + "'");
+                    "Sub-entity with id '" + id + "' already exists for field '" + fieldName + "'");
         }
     }
 
-    private String resolveIdentifier(String requestedId) {
-        String id = requestedId;
-        while (id == null || id.isBlank() || records.containsKey(id)) {
+    private Long resolveIdentifier(Long requestedId) {
+        Long id = requestedId;
+        while (id == null || records.containsKey(id)) {
             id = idGenerator.generate();
         }
         return id;

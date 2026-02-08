@@ -1,18 +1,19 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
- * Not equal operator: $ne
+ * Not equal operator: ne
  */
 public class NotEqualOperator extends ComparisonOperator {
 
     public NotEqualOperator() {
-        super("$ne");
+        super("ne");
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
-        return Criteria.where(fieldName).ne(value);
+    public SqlPredicate apply(String fieldName, Object value) {
+        return SqlPredicateFactory.jsonNotEquals(fieldName, value);
     }
 }

@@ -10,5 +10,5 @@ public interface SubEntityIdGenerator {
      *
      * @return unique identifier value
      */
-    String generate();
+    Long generate();
 }

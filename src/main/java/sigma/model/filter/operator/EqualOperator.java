@@ -1,18 +1,19 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 
 /**
- * Equality operator: $eq
+ * Equality operator: eq
  */
 public class EqualOperator extends ComparisonOperator {
 
     public EqualOperator() {
-        super("$eq");
+        super("eq");
     }
 
     @Override
-    public Criteria apply(String fieldName, Object value) {
-        return Criteria.where(fieldName).is(value);
+    public SqlPredicate apply(String fieldName, Object value) {
+        return SqlPredicateFactory.jsonEquals(fieldName, value);
     }
 }

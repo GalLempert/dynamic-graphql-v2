@@ -2,8 +2,8 @@ package sigma.model.filter.node;
 
 import sigma.model.filter.FilterConfig;
 import sigma.model.filter.FilterOperator;
+import sigma.model.filter.SqlPredicate;
 import sigma.model.filter.operator.OperatorStrategy;
-import org.springframework.data.mongodb.core.query.Criteria;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -11,7 +11,7 @@ import java.util.Map;
 
 /**
  * Represents a field filter node in the filter tree
- * Example: { "price": { "$gte": 100 } }
+ * Example: { "price": { "gte": 100 } }
  */
 public class FieldFilterNode extends FilterNode {
 
@@ -28,23 +28,27 @@ public class FieldFilterNode extends FilterNode {
      */
     public FieldFilterNode(String fieldName, Object value) {
         this.fieldName = fieldName;
-        this.operators = Map.of("$eq", value);
+        this.operators = Map.of("eq", value);
     }
 
     @Override
-    public Criteria toCriteria() {
+    public SqlPredicate toPredicate() {
         if (operators.isEmpty()) {
-            return Criteria.where(fieldName);
+            return new SqlPredicate("1=1");
         }
 
-        // If only one operator and it's $eq, use simple form
-        if (operators.size() == 1 && operators.containsKey("$eq")) {
-            FilterOperator op = FilterOperator.EQ;
-            return op.getStrategy().apply(fieldName, operators.get("$eq"));
+        // If only one operator, apply directly
+        if (operators.size() == 1) {
+            Map.Entry<String, Object> entry = operators.entrySet().iterator().next();
+            String operatorSymbol = entry.getKey();
+            Object value = entry.getValue();
+
+            FilterOperator operator = FilterOperator.fromString(operatorSymbol);
+            return operator.getStrategy().apply(fieldName, value);
         }
 
-        // Multiple operators on same field
-        Criteria criteria = Criteria.where(fieldName);
+        // Multiple operators on same field - AND them together
+        List<SqlPredicate> predicates = new ArrayList<>();
         for (Map.Entry<String, Object> entry : operators.entrySet()) {
             String operatorSymbol = entry.getKey();
             Object value = entry.getValue();
@@ -52,11 +56,10 @@ public class FieldFilterNode extends FilterNode {
             FilterOperator operator = FilterOperator.fromString(operatorSymbol);
             OperatorStrategy strategy = operator.getStrategy();
 
-            // Apply each operator to the same criteria
-            criteria = strategy.apply(fieldName, value);
+            predicates.add(strategy.apply(fieldName, value));
         }
 
-        return criteria;
+        return SqlPredicate.and(predicates.toArray(new SqlPredicate[0]));
     }
 
     @Override
@@ -73,11 +76,6 @@ public class FieldFilterNode extends FilterNode {
         for (Map.Entry<String, Object> entry : operators.entrySet()) {
             String operatorSymbol = entry.getKey();
             Object value = entry.getValue();
-
-            if (!operatorSymbol.startsWith("$")) {
-                errors.add("Expected operator (starting with $) but got '" + operatorSymbol + "' for field '" + fieldName + "'");
-                continue;
-            }
 
             try {
                 FilterOperator operator = FilterOperator.fromString(operatorSymbol);

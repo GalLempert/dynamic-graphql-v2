@@ -1,6 +1,6 @@
 package sigma.model.filter.operator;
 
-import org.springframework.data.mongodb.core.query.Criteria;
+import sigma.model.filter.SqlPredicate;
 
 import java.util.List;
 
@@ -9,15 +9,15 @@ import java.util.List;
  */
 public abstract class LogicalOperator implements OperatorStrategy {
 
-    private final String mongoOperator;
+    private final String operator;
 
-    protected LogicalOperator(String mongoOperator) {
-        this.mongoOperator = mongoOperator;
+    protected LogicalOperator(String operator) {
+        this.operator = operator;
     }
 
     @Override
-    public String getMongoOperator() {
-        return mongoOperator;
+    public String getOperator() {
+        return operator;
     }
 
     @Override
@@ -26,22 +26,22 @@ public abstract class LogicalOperator implements OperatorStrategy {
     }
 
     /**
-     * Logical operators work on lists of criteria, not field values
+     * Logical operators work on lists of predicates, not field values
      * This method should not be called directly
      */
     @Override
-    public Criteria apply(String fieldName, Object value) {
+    public SqlPredicate apply(String fieldName, Object value) {
         throw new UnsupportedOperationException(
-            "Logical operators should use applyCriteria() instead of apply()");
+            "Logical operators should use applyPredicates() instead of apply()");
     }
 
     /**
-     * Applies the logical operator to a list of criteria
+     * Applies the logical operator to a list of SQL predicates
      *
-     * @param criteriaList List of criteria to combine
-     * @return Combined criteria
+     * @param predicates List of predicates to combine
+     * @return Combined SqlPredicate
      */
-    public abstract Criteria applyCriteria(List<Criteria> criteriaList);
+    public abstract SqlPredicate applyPredicates(List<SqlPredicate> predicates);
 
     @Override
     public boolean isValidValue(Object value) {

@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  * Add specific getter methods for each configuration property your service needs
  *
  * Example usage:
- * - getMongoHost() -> reads from /{ENV}/dataSource/mongodb.host
+ * - getPostgresHost() -> reads from /{ENV}/dataSource/postgresql.host
  * - getServiceTimeout() -> reads from /{ENV}/{SERVICE}/timeout
  */
 @Component
@@ -54,30 +54,26 @@ public class ZookeeperConfigProperties {
         return serviceBasePath + "/endpoints";
     }
 
-    // ========== MongoDB DataSource Configuration ==========
+    // ========== PostgreSQL DataSource Configuration ==========
 
-    public String getMongoHost() {
-        return getDataSourceProperty("mongodb.host", "localhost");
+    public String getPostgresHost() {
+        return getDataSourceProperty("postgresql.host", "localhost");
     }
 
-    public String getMongoPort() {
-        return getDataSourceProperty("mongodb.port", "27017");
+    public String getPostgresPort() {
+        return getDataSourceProperty("postgresql.port", "5432");
     }
 
-    public String getMongoDatabase() {
-        return getDataSourceProperty("mongodb.database", "dynamic-graphql");
+    public String getPostgresDatabase() {
+        return getDataSourceProperty("postgresql.database", "dynamic_graphql");
     }
 
-    public String getMongoUsername() {
-        return getDataSourceProperty("mongodb.username");
+    public String getPostgresUsername() {
+        return getDataSourceProperty("postgresql.username");
     }
 
-    public String getMongoPassword() {
-        return getDataSourceProperty("mongodb.password");
-    }
-
-    public String getMongoAuthDatabase() {
-        return getDataSourceProperty("mongodb.authDatabase", "admin");
+    public String getPostgresPassword() {
+        return getDataSourceProperty("postgresql.password");
     }
 
     public String getEnumServiceUrl() {
