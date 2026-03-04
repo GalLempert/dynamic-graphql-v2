@@ -194,22 +194,9 @@ public final class SqlPredicateFactory {
      * Creates a predicate for JSON type check
      */
     public static SqlPredicate jsonType(String fieldName, Object typeValue) {
-        String type = typeValue.toString().toLowerCase();
-        String jsonType = mapTypeToJsonType(type);
+        String jsonType = JsonTypeMapping.toJsonType(typeValue.toString());
         String sql = dialect.jsonTypeCheck(DATA_COLUMN, fieldName, jsonType);
         return new SqlPredicate(sql);
-    }
-
-    private static String mapTypeToJsonType(String type) {
-        return switch (type) {
-            case "string" -> "string";
-            case "number", "int", "long", "double" -> "number";
-            case "boolean", "bool" -> "boolean";
-            case "array" -> "array";
-            case "object" -> "object";
-            case "null" -> "null";
-            default -> "string";
-        };
     }
 
     private static Double toDouble(Object value) {

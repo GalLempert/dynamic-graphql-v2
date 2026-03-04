@@ -8,6 +8,7 @@ import sigma.model.filter.FilterResult;
 import sigma.service.query.QueryBuilder;
 import sigma.service.query.QueryService;
 import sigma.service.validation.RequestValidator;
+import sigma.service.validation.ValidationResult;
 import lombok.Getter;
 
 import java.util.List;
@@ -36,7 +37,7 @@ public class FilteredQueryRequest implements QueryRequest {
     }
 
     @Override
-    public RequestValidator.ValidationResult validate(RequestValidator validator, Endpoint endpoint) {
+    public ValidationResult validate(RequestValidator validator, Endpoint endpoint) {
         return validator.validateFilteredRequest(this, endpoint);
     }
 

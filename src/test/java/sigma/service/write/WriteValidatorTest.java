@@ -10,6 +10,7 @@ import sigma.model.Endpoint;
 import sigma.model.filter.FilterConfig;
 import sigma.model.schema.SchemaReference;
 import sigma.service.schema.SchemaValidator;
+import sigma.service.validation.ValidationResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -81,10 +82,10 @@ class WriteValidatorTest {
         lenient().when(schemaReference.getSchemaName()).thenReturn("user-schema");
         lenient().when(filterValidator.validate(any(), any())).thenReturn(List.of());
         when(schemaValidator.validateBulk(anyList(), anyString()))
-            .thenReturn(SchemaValidator.ValidationResult.success());
+            .thenReturn(ValidationResult.success());
         
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
         
         // Then: Should use polymorphism to get documents
         assertTrue(result.isValid());
@@ -113,10 +114,10 @@ class WriteValidatorTest {
         when(schemaReference.getSchemaName()).thenReturn("user-schema");
         when(filterValidator.validate(any(), any())).thenReturn(List.of());
         when(schemaValidator.validateBulk(anyList(), anyString()))
-            .thenReturn(SchemaValidator.ValidationResult.success());
+            .thenReturn(ValidationResult.success());
         
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
         
         // Then: Should validate single document via polymorphism
         assertTrue(result.isValid());
@@ -143,7 +144,7 @@ class WriteValidatorTest {
         when(filterValidator.validate(any(), any())).thenReturn(List.of());
         
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
         
         // Then: Should NOT call schema validator (partial update)
         assertTrue(result.isValid());
@@ -167,7 +168,7 @@ class WriteValidatorTest {
         when(filterValidator.validate(any(), any())).thenReturn(List.of());
         
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
         
         // Then: Should NOT call schema validator (delete has no documents)
         assertTrue(result.isValid());
@@ -209,12 +210,12 @@ class WriteValidatorTest {
         when(schemaReference.getSchemaName()).thenReturn("schema");
         when(filterValidator.validate(any(), any())).thenReturn(List.of());
         when(schemaValidator.validateBulk(anyList(), anyString()))
-            .thenReturn(SchemaValidator.ValidationResult.success());
+            .thenReturn(ValidationResult.success());
         
         // When: Validate all requests using SAME code path
         WriteRequest[] requests = {createRequest, upsertRequest, updateRequest, deleteRequest};
         for (WriteRequest request : requests) {
-            WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+            ValidationResult result = writeValidator.validate(request, endpoint);
             assertTrue(result.isValid());
         }
         
@@ -235,7 +236,7 @@ class WriteValidatorTest {
         when(endpoint.isWriteMethodAllowed("POST")).thenReturn(false);
         
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
         
         // Then: Should fail
         assertFalse(result.isValid());
@@ -259,7 +260,7 @@ class WriteValidatorTest {
             .thenReturn(List.of("Invalid filter"));
 
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
 
         // Then: Should fail
         assertFalse(result.isValid());
@@ -281,12 +282,12 @@ class WriteValidatorTest {
         lenient().when(schemaReference.getSchemaName()).thenReturn("user-schema");
         lenient().when(filterValidator.validate(any(), any())).thenReturn(List.of());
         when(schemaValidator.validateBulk(anyList(), anyString()))
-            .thenReturn(SchemaValidator.ValidationResult.failure(
+            .thenReturn(ValidationResult.failure(
                 List.of("age: expected integer, got string")
             ));
         
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
         
         // Then: Should fail
         assertFalse(result.isValid());
@@ -307,10 +308,10 @@ class WriteValidatorTest {
         when(endpoint.getSchemaReference()).thenReturn(schemaReference);
         when(schemaReference.getSchemaName()).thenReturn("schema");
         when(schemaValidator.validateBulk(anyList(), anyString()))
-            .thenReturn(SchemaValidator.ValidationResult.success());
+            .thenReturn(ValidationResult.success());
 
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
 
         // Then: Should succeed without filter validation
         assertTrue(result.isValid());
@@ -334,7 +335,7 @@ class WriteValidatorTest {
             .thenReturn(List.of());
 
         // When: Validate request
-        WriteValidator.ValidationResult result = writeValidator.validate(request, endpoint);
+        ValidationResult result = writeValidator.validate(request, endpoint);
 
         // Then: Should use WRITE filter config, not READ filter config
         assertTrue(result.isValid());

@@ -6,6 +6,7 @@ import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
 import com.networknt.schema.ValidationMessage;
 import sigma.model.schema.JsonSchema;
+import sigma.service.validation.ValidationResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -100,35 +101,6 @@ public class SchemaValidator {
             return ValidationResult.success();
         } else {
             return ValidationResult.failure(allErrors);
-        }
-    }
-
-    /**
-     * Validation result
-     */
-    public static class ValidationResult {
-        private final boolean valid;
-        private final List<String> errors;
-
-        private ValidationResult(boolean valid, List<String> errors) {
-            this.valid = valid;
-            this.errors = errors;
-        }
-
-        public static ValidationResult success() {
-            return new ValidationResult(true, List.of());
-        }
-
-        public static ValidationResult failure(List<String> errors) {
-            return new ValidationResult(false, errors);
-        }
-
-        public boolean isValid() {
-            return valid;
-        }
-
-        public List<String> getErrors() {
-            return errors;
         }
     }
 }
