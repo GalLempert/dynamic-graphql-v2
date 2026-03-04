@@ -243,7 +243,7 @@ public class WriteService {
         Map<String, Object> processed = subEntityProcessor.prepareForUpsertCreate(document, subEntities);
         Map<String, Object> result = repository.upsert(tableName, filterResult.getWhereClause(),
                 processed, filterResult.getParameters());
-        return buildUpsertResponse(tableName, result);
+        return buildUpsertResponse(tableName, filterResult, result);
     }
 
     private WriteResponse upsertSimple(String tableName, FilterResult filterResult, Map<String, Object> document) {
@@ -263,15 +263,27 @@ public class WriteService {
                 documents, wasInserted ? "Document inserted successfully." : "Document updated successfully.");
     }
 
-    private WriteResponse buildUpsertResponse(String tableName, Map<String, Object> result) {
+    private WriteResponse buildUpsertResponse(String tableName, FilterResult filterResult, Map<String, Object> result) {
         boolean wasInserted = result.containsKey("upsertedId");
         String documentId = wasInserted ? String.valueOf(result.get("upsertedId")) : null;
-        List<Map<String, Object>> documents = (wasInserted && documentId != null)
-                ? repository.findByIds(tableName, List.of(Long.parseLong(documentId)))
-                : List.of();
+        List<Map<String, Object>> documents = loadUpsertedDocuments(tableName, filterResult, documentId);
+
+        if (documentId == null) {
+            documentId = extractDocumentId(documents);
+        }
+
         return new UpsertResponse(wasInserted, documentId,
                 extractCount(result, "matchedCount"), extractCount(result, "modifiedCount"),
                 documents, wasInserted ? "Document inserted successfully." : "Document updated successfully.");
+    }
+
+    private String extractDocumentId(List<Map<String, Object>> documents) {
+        if (documents == null || documents.isEmpty()) {
+            return null;
+        }
+
+        Object id = documents.get(0).get("id");
+        return id != null ? String.valueOf(id) : null;
     }
 
     private DynamicDocument findFirstDocument(String tableName, FilterResult filterResult) {
