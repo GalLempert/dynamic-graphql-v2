@@ -7,6 +7,7 @@ import sigma.model.filter.FilterResult;
 import sigma.service.query.QueryBuilder;
 import sigma.service.query.QueryService;
 import sigma.service.validation.RequestValidator;
+import sigma.service.validation.ValidationResult;
 
 import java.util.List;
 import java.util.Map;
@@ -28,8 +29,8 @@ public class FullCollectionRequest implements QueryRequest {
     }
 
     @Override
-    public RequestValidator.ValidationResult validate(RequestValidator validator, Endpoint endpoint) {
-        return RequestValidator.ValidationResult.success(); // Always valid
+    public ValidationResult validate(RequestValidator validator, Endpoint endpoint) {
+        return ValidationResult.success();
     }
 
     @Override

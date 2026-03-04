@@ -1,6 +1,5 @@
 package sigma.service.request;
 
-import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import sigma.dto.request.*;
 import sigma.model.Endpoint;
@@ -11,7 +10,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 /**
@@ -187,215 +185,18 @@ public class RequestParser {
                param.equals("limit") || param.equals("skip") || param.equals("sort");
     }
 
-    // ========== WRITE REQUEST PARSING ==========
-
     /**
-     * Parses an HTTP request into a WriteRequest object
-     *
-     * @param method HTTP method (POST, PUT, PATCH, DELETE)
-     * @param body Request body (may be null for DELETE)
-     * @param request HttpServletRequest for accessing parameters
-     * @param endpoint Endpoint configuration
-     * @return Strongly-typed WriteRequest
+     * Parses an HTTP request into a WriteRequest object.
+     * Delegates to WriteRequestFactory (Strategy pattern).
      */
     public WriteRequest parseWrite(String method, String body, HttpServletRequest request, Endpoint endpoint) {
         logger.debug("Parsing write request: method={}, hasBody={}", method, body != null && !body.isEmpty());
 
-        // Extract request ID from header (for audit trail)
         String requestId = request.getHeader("X-Request-ID");
         if (requestId == null || requestId.isEmpty()) {
             requestId = "req-" + System.currentTimeMillis();
         }
 
-        // Uses Strategy pattern via factory - ZERO switch statements!
         return writeRequestFactory.create(method, body, request, requestId);
-    }
-
-    /**
-     * Parses POST request → CreateRequest
-     */
-    private WriteRequest parseCreateRequest(String body, String requestId) {
-        if (body == null || body.isEmpty()) {
-            throw new IllegalArgumentException("POST request requires a body");
-        }
-
-        try {
-            // Try parsing as array first (bulk insert)
-            if (body.trim().startsWith("[")) {
-                List<Map<String, Object>> documents = objectMapper.readValue(
-                        body,
-                        new TypeReference<List<Map<String, Object>>>() {}
-                );
-                logger.debug("Parsed bulk CREATE request: {} documents", documents.size());
-                return new CreateRequest(documents, requestId);
-            } else {
-                // Single document
-                Map<String, Object> document = objectMapper.readValue(
-                        body,
-                        new TypeReference<Map<String, Object>>() {}
-                );
-                logger.debug("Parsed single CREATE request");
-                return new CreateRequest(document, requestId);
-            }
-
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid JSON body for CREATE: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Parses PUT request → UpsertRequest
-     */
-    private WriteRequest parseUpsertRequest(String body, HttpServletRequest request, String requestId) {
-        if (body == null || body.isEmpty()) {
-            throw new IllegalArgumentException("PUT request requires a body");
-        }
-
-        try {
-            Map<String, Object> jsonBody = objectMapper.readValue(
-                    body,
-                    new TypeReference<Map<String, Object>>() {}
-            );
-
-            // Check if body contains "filter" and "document" fields (complex format)
-            if (jsonBody.containsKey("filter") && jsonBody.containsKey("document")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> filter = (Map<String, Object>) jsonBody.get("filter");
-                @SuppressWarnings("unchecked")
-                Map<String, Object> document = (Map<String, Object>) jsonBody.get("document");
-
-                logger.debug("Parsed UPSERT request with explicit filter");
-                return new UpsertRequest(filter, document, requestId);
-
-            } else {
-                // Simple format: filter from query params, document from body
-                Map<String, Object> filter = extractFilterFromParams(request);
-                logger.debug("Parsed UPSERT request with query param filter");
-                return new UpsertRequest(filter, jsonBody, requestId);
-            }
-
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid JSON body for UPSERT: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Parses PATCH request → UpdateRequest
-     */
-    private WriteRequest parseUpdateRequest(String body, HttpServletRequest request, String requestId) {
-        if (body == null || body.isEmpty()) {
-            throw new IllegalArgumentException("PATCH request requires a body");
-        }
-
-        try {
-            Map<String, Object> jsonBody = objectMapper.readValue(
-                    body,
-                    new TypeReference<Map<String, Object>>() {}
-            );
-
-            Map<String, Object> filter;
-            Map<String, Object> updates;
-            boolean updateMultiple = false;
-
-            // Check if body contains "filter" and "updates" fields (complex format)
-            if (jsonBody.containsKey("filter") && jsonBody.containsKey("updates")) {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> filterFromBody = (Map<String, Object>) jsonBody.get("filter");
-                filter = filterFromBody;
-
-                @SuppressWarnings("unchecked")
-                Map<String, Object> updatesFromBody = (Map<String, Object>) jsonBody.get("updates");
-                updates = updatesFromBody;
-
-                // Check for updateMultiple flag
-                if (jsonBody.containsKey("updateMultiple")) {
-                    updateMultiple = (Boolean) jsonBody.get("updateMultiple");
-                }
-
-                logger.debug("Parsed UPDATE request with explicit filter");
-
-            } else {
-                // Simple format: filter from query params, updates from body
-                filter = extractFilterFromParams(request);
-                updates = jsonBody;
-
-                // If no filter provided, treat as update multiple
-                updateMultiple = filter.isEmpty();
-
-                logger.debug("Parsed UPDATE request with query param filter");
-            }
-
-            return new UpdateRequest(filter, updates, requestId, updateMultiple);
-
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Invalid JSON body for UPDATE: " + e.getMessage(), e);
-        }
-    }
-
-    /**
-     * Parses DELETE request → DeleteRequest
-     */
-    private WriteRequest parseDeleteRequest(String body, HttpServletRequest request, String requestId) {
-        Map<String, Object> filter;
-        boolean deleteMultiple = false;
-
-        // Check if body is provided with explicit filter
-        if (body != null && !body.isEmpty()) {
-            try {
-                Map<String, Object> jsonBody = objectMapper.readValue(
-                        body,
-                        new TypeReference<Map<String, Object>>() {}
-                );
-
-                if (jsonBody.containsKey("filter")) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> filterFromBody = (Map<String, Object>) jsonBody.get("filter");
-                    filter = filterFromBody;
-
-                    // Check for deleteMultiple flag
-                    if (jsonBody.containsKey("deleteMultiple")) {
-                        deleteMultiple = (Boolean) jsonBody.get("deleteMultiple");
-                    }
-
-                    logger.debug("Parsed DELETE request with body filter");
-                } else {
-                    // Body is the filter itself
-                    filter = jsonBody;
-                    logger.debug("Parsed DELETE request with body as filter");
-                }
-
-            } catch (Exception e) {
-                throw new IllegalArgumentException("Invalid JSON body for DELETE: " + e.getMessage(), e);
-            }
-
-        } else {
-            // No body, use query parameters as filter
-            filter = extractFilterFromParams(request);
-
-            // If no filter provided, this is dangerous - require explicit confirmation
-            if (filter.isEmpty()) {
-                throw new IllegalArgumentException("DELETE request requires a filter (query params or body)");
-            }
-
-            logger.debug("Parsed DELETE request with query param filter");
-        }
-
-        return new DeleteRequest(filter, requestId, deleteMultiple);
-    }
-
-    /**
-     * Extracts filter from query parameters
-     */
-    private Map<String, Object> extractFilterFromParams(HttpServletRequest request) {
-        Map<String, Object> filter = new HashMap<>();
-
-        request.getParameterMap().forEach((key, values) -> {
-            if (!isSpecialParameter(key) && values.length > 0) {
-                // Simple equals filter for query params
-                filter.put(key, Map.of("eq", values[0]));
-            }
-        });
-
-        return filter;
     }
 }

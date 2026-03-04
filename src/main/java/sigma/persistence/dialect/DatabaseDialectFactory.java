@@ -4,33 +4,41 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
+import java.util.function.Supplier;
+
 /**
  * Factory for creating database dialect instances based on configuration.
+ * Uses a supplier map instead of switch statements for extensibility.
  */
 @Component
 public class DatabaseDialectFactory {
 
     private static final Logger logger = LoggerFactory.getLogger(DatabaseDialectFactory.class);
 
+    private static final Map<DatabaseType, Supplier<DatabaseDialect>> DIALECT_SUPPLIERS = Map.of(
+            DatabaseType.POSTGRESQL, PostgreSqlDialect::new,
+            DatabaseType.ORACLE, OracleDialect::new,
+            DatabaseType.H2, H2Dialect::new
+    );
+
     /**
      * Creates a dialect instance for the specified database type.
      */
     public DatabaseDialect createDialect(DatabaseType type) {
         logger.info("Creating database dialect for type: {}", type);
-
-        return switch (type) {
-            case POSTGRESQL -> new PostgreSqlDialect();
-            case ORACLE -> new OracleDialect();
-            case H2 -> new H2Dialect();
-        };
+        Supplier<DatabaseDialect> supplier = DIALECT_SUPPLIERS.get(type);
+        if (supplier == null) {
+            throw new IllegalArgumentException("No dialect available for type: " + type);
+        }
+        return supplier.get();
     }
 
     /**
      * Creates a dialect instance from a string identifier.
      */
     public DatabaseDialect createDialect(String typeIdentifier) {
-        DatabaseType type = DatabaseType.fromString(typeIdentifier);
-        return createDialect(type);
+        return createDialect(DatabaseType.fromString(typeIdentifier));
     }
 
     /**
@@ -41,17 +49,9 @@ public class DatabaseDialectFactory {
             logger.warn("No JDBC URL provided, defaulting to PostgreSQL");
             return DatabaseType.POSTGRESQL;
         }
-
-        String lowerUrl = jdbcUrl.toLowerCase();
-        if (lowerUrl.contains(":postgresql:") || lowerUrl.contains(":postgres:")) {
+        return DatabaseType.fromJdbcUrl(jdbcUrl).orElseGet(() -> {
+            logger.warn("Could not detect database type from URL: {}, defaulting to PostgreSQL", jdbcUrl);
             return DatabaseType.POSTGRESQL;
-        } else if (lowerUrl.contains(":oracle:")) {
-            return DatabaseType.ORACLE;
-        } else if (lowerUrl.contains(":h2:")) {
-            return DatabaseType.H2;
-        }
-
-        logger.warn("Could not detect database type from URL: {}, defaulting to PostgreSQL", jdbcUrl);
-        return DatabaseType.POSTGRESQL;
+        });
     }
 }

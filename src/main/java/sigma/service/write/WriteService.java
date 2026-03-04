@@ -107,11 +107,7 @@ public class WriteService {
      */
     public WriteResponse executeUpdate(UpdateRequest request, String tableName) {
         Endpoint endpoint = requireEndpointContext();
-
-        sigma.model.filter.FilterRequest filterRequest =
-                new sigma.model.filter.FilterRequest(request.getFilter(), null);
-        FilterResult filterResult = filterTranslator.translate(filterRequest);
-
+        FilterResult filterResult = translateFilter(request.getFilter());
         Map<String, Object> updates = sanitizeDocumentForWrite(request.getUpdates());
         List<DynamicDocument> matchingDocuments = repository.findDocuments(
                 tableName,
@@ -163,10 +159,7 @@ public class WriteService {
      * Executes DELETE operation (logical delete)
      */
     public WriteResponse executeDelete(DeleteRequest request, String tableName) {
-
-        sigma.model.filter.FilterRequest filterRequest =
-                new sigma.model.filter.FilterRequest(request.getFilter(), null);
-        FilterResult filterResult = filterTranslator.translate(filterRequest);
+        FilterResult filterResult = translateFilter(request.getFilter());
 
         List<DynamicDocument> documentsBeforeDelete = repository.findDocuments(
                 tableName,
@@ -196,143 +189,116 @@ public class WriteService {
     }
 
     /**
-     * Executes UPSERT operation
+     * Executes UPSERT operation.
+     * Delegates to sub-entity aware or simple path based on endpoint configuration.
      */
     public WriteResponse executeUpsert(UpsertRequest request, String tableName) {
         Endpoint endpoint = requireEndpointContext();
-
-        sigma.model.filter.FilterRequest filterRequest =
-                new sigma.model.filter.FilterRequest(request.getFilter(), null);
-        FilterResult filterResult = filterTranslator.translate(filterRequest);
-
+        FilterResult filterResult = translateFilter(request.getFilter());
         Map<String, Object> document = sanitizeDocumentForWrite(request.getDocument());
         document.put("latestRequestId", request.getRequestId());
 
         Set<String> subEntities = endpoint.getSubEntities();
-
         if (!subEntities.isEmpty()) {
-            List<DynamicDocument> existingDocs = repository.findDocuments(
-                    tableName,
-                    filterResult.getWhereClause(),
-                    filterResult.getParameters(),
-                    1
-            );
+            return upsertWithSubEntities(tableName, filterResult, document, subEntities, request.getRequestId());
+        }
+        return upsertSimple(tableName, filterResult, document);
+    }
 
-            if (!existingDocs.isEmpty()) {
-                DynamicDocument existingDoc = existingDocs.get(0);
-                Map<String, Object> existingMap = existingDoc.toMap();
-                Map<String, Object> updates = new LinkedHashMap<>(document);
-                subEntityProcessor.applyUpsertUpdate(updates, subEntities, existingMap);
+    private WriteResponse upsertWithSubEntities(String tableName, FilterResult filterResult,
+                                                 Map<String, Object> document, Set<String> subEntities,
+                                                 String requestId) {
+        DynamicDocument existingDoc = findFirstDocument(tableName, filterResult);
+        if (existingDoc != null) {
+            return upsertUpdateExisting(tableName, filterResult, document, subEntities, existingDoc, requestId);
+        }
+        return upsertInsertNew(tableName, filterResult, document, subEntities);
+    }
 
-                DocumentChangeResult changeResult =
-                        documentChangeDetector.evaluate(List.of(existingMap), updates);
+    private WriteResponse upsertUpdateExisting(String tableName, FilterResult filterResult,
+                                                Map<String, Object> document, Set<String> subEntities,
+                                                DynamicDocument existingDoc, String requestId) {
+        Map<String, Object> existingMap = existingDoc.toMap();
+        Map<String, Object> updates = new LinkedHashMap<>(document);
+        subEntityProcessor.applyUpsertUpdate(updates, subEntities, existingMap);
 
-                String documentId = String.valueOf(existingDoc.getId());
+        DocumentChangeResult changeResult = documentChangeDetector.evaluate(List.of(existingMap), updates);
+        String documentId = String.valueOf(existingDoc.getId());
 
-                if (!changeResult.hasChanges()) {
-                    return new UpsertResponse(false, documentId, 1, 0,
-                            List.of(existingMap),
-                            "No changes detected; document remains unchanged.");
-                }
-
-                Map<String, Object> effectiveUpdates = new LinkedHashMap<>(updates);
-                effectiveUpdates.put("latestRequestId", request.getRequestId());
-
-                repository.update(
-                        tableName,
-                        filterResult.getWhereClause(),
-                        effectiveUpdates,
-                        filterResult.getParameters(),
-                        false
-                );
-
-                List<Map<String, Object>> updatedDocuments = repository.findByIds(tableName, List.of(existingDoc.getId()));
-
-                return new UpsertResponse(false, documentId, 1L, 1L,
-                        updatedDocuments, "Document updated successfully.");
-            }
-
-            Map<String, Object> processed = subEntityProcessor.prepareForUpsertCreate(document, subEntities);
-            Map<String, Object> result = repository.upsert(
-                    tableName,
-                    filterResult.getWhereClause(),
-                    processed,
-                    filterResult.getParameters()
-            );
-
-            boolean wasInserted = result.containsKey("upsertedId");
-            String documentId = wasInserted
-                    ? String.valueOf(result.get("upsertedId"))
-                    : null;
-
-            List<Map<String, Object>> documents = wasInserted && documentId != null
-                    ? repository.findByIds(tableName, List.of(Long.parseLong(documentId)))
-                    : List.of();
-
-            String message = wasInserted
-                    ? "Document inserted successfully."
-                    : "Document updated successfully.";
-
-            long matchedCount = result.containsKey("matchedCount") ? ((Number) result.get("matchedCount")).longValue() : 0;
-            long modifiedCount = result.containsKey("modifiedCount") ? ((Number) result.get("modifiedCount")).longValue() : 0;
-
-            return new UpsertResponse(wasInserted, documentId, matchedCount, modifiedCount,
-                    documents, message);
+        if (!changeResult.hasChanges()) {
+            return new UpsertResponse(false, documentId, 1, 0,
+                    List.of(existingMap), "No changes detected; document remains unchanged.");
         }
 
+        Map<String, Object> effectiveUpdates = new LinkedHashMap<>(updates);
+        effectiveUpdates.put("latestRequestId", requestId);
+        repository.update(tableName, filterResult.getWhereClause(), effectiveUpdates, filterResult.getParameters(), false);
+
+        List<Map<String, Object>> updatedDocuments = repository.findByIds(tableName, List.of(existingDoc.getId()));
+        return new UpsertResponse(false, documentId, 1L, 1L, updatedDocuments, "Document updated successfully.");
+    }
+
+    private WriteResponse upsertInsertNew(String tableName, FilterResult filterResult,
+                                           Map<String, Object> document, Set<String> subEntities) {
+        Map<String, Object> processed = subEntityProcessor.prepareForUpsertCreate(document, subEntities);
+        Map<String, Object> result = repository.upsert(tableName, filterResult.getWhereClause(),
+                processed, filterResult.getParameters());
+        return buildUpsertResponse(tableName, result);
+    }
+
+    private WriteResponse upsertSimple(String tableName, FilterResult filterResult, Map<String, Object> document) {
         document.put("isDeleted", false);
+        DynamicDocument existingDoc = findFirstDocument(tableName, filterResult);
+        String existingDocumentId = existingDoc != null ? String.valueOf(existingDoc.getId()) : null;
 
-        List<DynamicDocument> existingDocuments = repository.findDocuments(
-                tableName,
-                filterResult.getWhereClause(),
-                filterResult.getParameters(),
-                1
-        );
-        String existingDocumentId = existingDocuments.isEmpty()
-                ? null
-                : String.valueOf(existingDocuments.get(0).getId());
-
-        Map<String, Object> result = repository.upsert(
-                tableName,
-                filterResult.getWhereClause(),
-                document,
-                filterResult.getParameters()
-        );
+        Map<String, Object> result = repository.upsert(tableName, filterResult.getWhereClause(),
+                document, filterResult.getParameters());
 
         boolean wasInserted = result.containsKey("upsertedId");
+        String documentId = wasInserted ? String.valueOf(result.get("upsertedId")) : existingDocumentId;
+        List<Map<String, Object>> documents = loadUpsertedDocuments(tableName, filterResult, documentId);
 
-        String documentId;
-        List<Map<String, Object>> documents;
-
-        if (wasInserted) {
-            documentId = String.valueOf(result.get("upsertedId"));
-            documents = repository.findByIds(tableName, List.of(Long.parseLong(documentId)));
-        } else if (existingDocumentId != null) {
-            documentId = existingDocumentId;
-            documents = repository.findByIds(tableName, List.of(Long.parseLong(documentId)));
-        } else {
-            List<DynamicDocument> refreshed = repository.findDocuments(
-                    tableName,
-                    filterResult.getWhereClause(),
-                    filterResult.getParameters(),
-                    1
-            );
-            documentId = refreshed.isEmpty() ? null : String.valueOf(refreshed.get(0).getId());
-            documents = refreshed.stream()
-                    .map(DynamicDocument::toMap)
-                    .collect(Collectors.toList());
-        }
-
-        String message = wasInserted
-                ? "Document inserted successfully."
-                : "Document updated successfully.";
-
-        long matchedCount = result.containsKey("matchedCount") ? ((Number) result.get("matchedCount")).longValue() : 0;
-        long modifiedCount = result.containsKey("modifiedCount") ? ((Number) result.get("modifiedCount")).longValue() : 0;
-
-        return new UpsertResponse(wasInserted, documentId, matchedCount, modifiedCount,
-                documents, message);
+        return new UpsertResponse(wasInserted, documentId,
+                extractCount(result, "matchedCount"), extractCount(result, "modifiedCount"),
+                documents, wasInserted ? "Document inserted successfully." : "Document updated successfully.");
     }
+
+    private WriteResponse buildUpsertResponse(String tableName, Map<String, Object> result) {
+        boolean wasInserted = result.containsKey("upsertedId");
+        String documentId = wasInserted ? String.valueOf(result.get("upsertedId")) : null;
+        List<Map<String, Object>> documents = (wasInserted && documentId != null)
+                ? repository.findByIds(tableName, List.of(Long.parseLong(documentId)))
+                : List.of();
+        return new UpsertResponse(wasInserted, documentId,
+                extractCount(result, "matchedCount"), extractCount(result, "modifiedCount"),
+                documents, wasInserted ? "Document inserted successfully." : "Document updated successfully.");
+    }
+
+    private DynamicDocument findFirstDocument(String tableName, FilterResult filterResult) {
+        List<DynamicDocument> docs = repository.findDocuments(tableName, filterResult.getWhereClause(),
+                filterResult.getParameters(), 1);
+        return docs.isEmpty() ? null : docs.get(0);
+    }
+
+    private List<Map<String, Object>> loadUpsertedDocuments(String tableName, FilterResult filterResult, String documentId) {
+        if (documentId != null) {
+            return repository.findByIds(tableName, List.of(Long.parseLong(documentId)));
+        }
+        List<DynamicDocument> refreshed = repository.findDocuments(tableName, filterResult.getWhereClause(),
+                filterResult.getParameters(), 1);
+        return refreshed.stream().map(DynamicDocument::toMap).collect(Collectors.toList());
+    }
+
+    private long extractCount(Map<String, Object> result, String key) {
+        return result.containsKey(key) ? ((Number) result.get(key)).longValue() : 0;
+    }
+
+    private FilterResult translateFilter(Map<String, Object> filter) {
+        sigma.model.filter.FilterRequest filterRequest = new sigma.model.filter.FilterRequest(filter, null);
+        return filterTranslator.translate(filterRequest);
+    }
+
+    private static final Set<String> RESERVED_WRITE_FIELDS = Set.of("isDeleted", "latestRequestId");
 
     private Map<String, Object> sanitizeDocumentForWrite(Map<String, Object> source) {
         Map<String, Object> sanitized = new LinkedHashMap<>();
@@ -341,13 +307,9 @@ public class WriteService {
         }
 
         source.forEach((key, value) -> {
-            if (key == null) {
-                return;
+            if (key != null && !RESERVED_WRITE_FIELDS.contains(key)) {
+                sanitized.put(key, value);
             }
-            if ("isDeleted".equals(key) || "latestRequestId".equals(key)) {
-                return;
-            }
-            sanitized.put(key, value);
         });
 
         return sanitized;

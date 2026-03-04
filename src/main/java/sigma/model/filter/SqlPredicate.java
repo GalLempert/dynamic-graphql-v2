@@ -262,36 +262,8 @@ public class SqlPredicate {
      * Creates a predicate for JSONB type check
      */
     public static SqlPredicate jsonbType(String fieldName, Object typeValue) {
-        String type = typeValue.toString().toLowerCase();
-        String sql;
-
-        switch (type) {
-            case "string":
-                sql = String.format("jsonb_typeof(d.dynamicFields->'%s') = 'string'", escapeJsonKey(fieldName));
-                break;
-            case "number":
-            case "int":
-            case "long":
-            case "double":
-                sql = String.format("jsonb_typeof(d.dynamicFields->'%s') = 'number'", escapeJsonKey(fieldName));
-                break;
-            case "boolean":
-            case "bool":
-                sql = String.format("jsonb_typeof(d.dynamicFields->'%s') = 'boolean'", escapeJsonKey(fieldName));
-                break;
-            case "array":
-                sql = String.format("jsonb_typeof(d.dynamicFields->'%s') = 'array'", escapeJsonKey(fieldName));
-                break;
-            case "object":
-                sql = String.format("jsonb_typeof(d.dynamicFields->'%s') = 'object'", escapeJsonKey(fieldName));
-                break;
-            case "null":
-                sql = String.format("jsonb_typeof(d.dynamicFields->'%s') = 'null'", escapeJsonKey(fieldName));
-                break;
-            default:
-                sql = "1=1"; // Unknown type, don't filter
-        }
-
+        String jsonbType = JsonTypeMapping.toJsonType(typeValue.toString());
+        String sql = String.format("jsonb_typeof(d.dynamicFields->'%s') = '%s'", escapeJsonKey(fieldName), jsonbType);
         return new SqlPredicate(sql);
     }
 

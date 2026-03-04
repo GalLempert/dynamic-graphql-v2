@@ -36,7 +36,7 @@ public interface QueryRequest {
      * @param endpoint The endpoint configuration
      * @return Validation result
      */
-    sigma.service.validation.RequestValidator.ValidationResult validate(
+    sigma.service.validation.ValidationResult validate(
             sigma.service.validation.RequestValidator validator,
             sigma.model.Endpoint endpoint
     );

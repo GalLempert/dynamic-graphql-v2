@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -136,42 +135,8 @@ public class EnumResponseTransformer {
             if (index == segments.size()) {
                 return enrichValue(current, dynamicEnum);
             }
-
             EnumFieldPointer.Segment segment = segments.get(index);
-            if (segment instanceof EnumFieldPointer.PropertySegment propertySegment) {
-                if (!(current instanceof Map<?, ?> currentMap)) {
-                    return current;
-                }
-                Object value = currentMap.get(propertySegment.name());
-                if (value == null) {
-                    return current;
-                }
-                Object transformed = transformValue(value, segments, index + 1, dynamicEnum);
-                if (transformed != value) {
-                    @SuppressWarnings("unchecked")
-                    Map<String, Object> writableMap = (Map<String, Object>) currentMap;
-                    writableMap.put(propertySegment.name(), transformed);
-                }
-                return current;
-            }
-
-            if (segment instanceof EnumFieldPointer.ArraySegment) {
-                if (!(current instanceof List<?> list)) {
-                    return current;
-                }
-                for (int i = 0; i < list.size(); i++) {
-                    Object element = list.get(i);
-                    Object transformed = transformValue(element, segments, index + 1, dynamicEnum);
-                    if (!Objects.equals(transformed, element)) {
-                        @SuppressWarnings("unchecked")
-                        List<Object> mutable = (List<Object>) list;
-                        mutable.set(i, transformed);
-                    }
-                }
-                return current;
-            }
-
-            return current;
+            return segment.traverse(current, next -> transformValue(next, segments, index + 1, dynamicEnum));
         }
 
         private Object enrichValue(Object value, DynamicEnum dynamicEnum) {

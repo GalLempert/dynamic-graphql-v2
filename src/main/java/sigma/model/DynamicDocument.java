@@ -8,6 +8,7 @@ import org.springframework.data.relational.core.mapping.Table;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Set;
 
 /**
  * Concrete class used by the Generic DAL for dynamic, schemaless entities.
@@ -28,10 +29,11 @@ import java.util.Map;
 @Table("dynamic_documents")
 public class DynamicDocument extends AuditableBaseDocument {
 
-    /**
-     * PostgreSQL sequence-based identifier
-     * Auto-generated using a sequence
-     */
+    private static final Set<String> SYSTEM_FIELDS = Set.of(
+            "id", "version", "createdAt", "lastModifiedAt",
+            "createdBy", "lastModifiedBy", "latestRequestId", "isDeleted"
+    );
+
     @Id
     private Long id;
 
@@ -138,50 +140,32 @@ public class DynamicDocument extends AuditableBaseDocument {
         }
 
         DynamicDocument doc = new DynamicDocument();
+        doc.setId(toLong(map.get("id")));
+        doc.setVersion(toLong(map.get("version")));
+        doc.setDeleted(toBoolean(map.get("isDeleted")));
+        doc.setLatestRequestId(toStringOrNull(map.get("latestRequestId")));
 
-        // Extract system fields
-        if (map.containsKey("id")) {
-            Object idValue = map.get("id");
-            if (idValue instanceof Number) {
-                doc.setId(((Number) idValue).longValue());
-            } else if (idValue != null) {
-                try {
-                    doc.setId(Long.parseLong(idValue.toString()));
-                } catch (NumberFormatException e) {
-                    // ID is not a valid number, leave it null
-                }
-            }
-        }
-        if (map.containsKey("version")) {
-            Object version = map.get("version");
-            doc.setVersion(version instanceof Number ? ((Number) version).longValue() : null);
-        }
-
-        // Copy dynamic fields (exclude system fields)
         Map<String, Object> dynamicFields = new HashMap<>(map);
-        dynamicFields.remove("id");
-        dynamicFields.remove("version");
-        dynamicFields.remove("createdAt");
-        dynamicFields.remove("lastModifiedAt");
-        dynamicFields.remove("createdBy");
-        dynamicFields.remove("lastModifiedBy");
-        dynamicFields.remove("latestRequestId");
-        dynamicFields.remove("isDeleted");
-
-        if (map.containsKey("isDeleted")) {
-            Object deleted = map.get("isDeleted");
-            doc.setDeleted(deleted instanceof Boolean ? (Boolean) deleted : Boolean.parseBoolean(deleted.toString()));
-        }
-
-        if (map.containsKey("latestRequestId")) {
-            Object requestId = map.get("latestRequestId");
-            if (requestId != null) {
-                doc.setLatestRequestId(requestId.toString());
-            }
-        }
-
+        SYSTEM_FIELDS.forEach(dynamicFields::remove);
         doc.setDynamicFields(dynamicFields);
 
         return doc;
+    }
+
+    private static Long toLong(Object value) {
+        if (value instanceof Number number) return number.longValue();
+        if (value != null) {
+            try { return Long.parseLong(value.toString()); } catch (NumberFormatException ignored) { }
+        }
+        return null;
+    }
+
+    private static boolean toBoolean(Object value) {
+        if (value instanceof Boolean b) return b;
+        return value != null && Boolean.parseBoolean(value.toString());
+    }
+
+    private static String toStringOrNull(Object value) {
+        return value != null ? value.toString() : null;
     }
 }
