@@ -1,0 +1,62 @@
+{
+  "description": "Seed configuration for LocalModeSmokeTest - paths match ENV=test SERVICE=dynamic-service provided by surefire",
+  "tree": {
+    "/test": {
+      "data": "",
+      "children": {
+        "/test/dynamic-service": {
+          "data": "",
+          "children": {
+            "/test/dynamic-service/apiPrefix": {
+              "data": "/api"
+            },
+            "/test/dynamic-service/endpoints": {
+              "data": "",
+              "children": {
+                "/test/dynamic-service/endpoints/gadgets": {
+                  "data": "",
+                  "children": {
+                    "/test/dynamic-service/endpoints/gadgets/path": {
+                      "data": "/gadgets"
+                    },
+                    "/test/dynamic-service/endpoints/gadgets/httpMethod": {
+                      "data": "GET,POST"
+                    },
+                    "/test/dynamic-service/endpoints/gadgets/databaseCollection": {
+                      "data": "gadgets"
+                    },
+                    "/test/dynamic-service/endpoints/gadgets/type": {
+                      "data": "REST"
+                    },
+                    "/test/dynamic-service/endpoints/gadgets/writeMethods": {
+                      "data": "POST"
+                    },
+                    "/test/dynamic-service/endpoints/gadgets/readFilter": {
+                      "data": "",
+                      "children": {
+                        "/test/dynamic-service/endpoints/gadgets/readFilter/name": {
+                          "data": "eq"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/test/Globals": {
+          "data": "",
+          "children": {
+            "/test/Globals/EnableEnumService": {
+              "data": "false"
+            },
+            "/test/Globals/IsEnvValidate": {
+              "data": "false"
+            }
+          }
+        }
+      }
+    }
+  }
+}

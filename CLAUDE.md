@@ -20,8 +20,8 @@ mvn spring-boot:run        # Start the application (port 8080)
 # Run a specific test class
 mvn test -Dtest=H2FullLifecycleIntegrationTest
 
-# Run with H2 profile (no external DB needed)
-mvn spring-boot:run -Dspring.profiles.active=h2
+# Local dev mode: H2 in-memory DB + endpoints from local-config.json (no ZooKeeper needed)
+ENV=dev SERVICE=sigma mvn spring-boot:run -Dspring-boot.run.profiles=local
 ```
 
 **Required environment variables (production):**

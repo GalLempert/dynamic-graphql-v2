@@ -1,0 +1,126 @@
+{
+  "description": "Local dev mode configuration - same tree format as zookeeper-import.json. Paths must match /{ENV}/{SERVICE}; run with ENV=dev SERVICE=sigma.",
+  "environment": "dev",
+  "service": "sigma",
+  "tree": {
+    "/dev": {
+      "data": "",
+      "children": {
+        "/dev/sigma": {
+          "data": "",
+          "children": {
+            "/dev/sigma/apiPrefix": {
+              "data": "/api"
+            },
+            "/dev/sigma/endpoints": {
+              "data": "",
+              "children": {
+                "/dev/sigma/endpoints/products": {
+                  "data": "",
+                  "children": {
+                    "/dev/sigma/endpoints/products/path": {
+                      "data": "/products"
+                    },
+                    "/dev/sigma/endpoints/products/httpMethod": {
+                      "data": "GET,POST,PUT,DELETE"
+                    },
+                    "/dev/sigma/endpoints/products/databaseCollection": {
+                      "data": "products"
+                    },
+                    "/dev/sigma/endpoints/products/type": {
+                      "data": "REST"
+                    },
+                    "/dev/sigma/endpoints/products/sequenceEnabled": {
+                      "data": "true"
+                    },
+                    "/dev/sigma/endpoints/products/defaultBulkSize": {
+                      "data": "100"
+                    },
+                    "/dev/sigma/endpoints/products/writeMethods": {
+                      "data": "POST,PUT,DELETE"
+                    },
+                    "/dev/sigma/endpoints/products/readFilter": {
+                      "data": "",
+                      "children": {
+                        "/dev/sigma/endpoints/products/readFilter/name": {
+                          "data": "eq,regex"
+                        },
+                        "/dev/sigma/endpoints/products/readFilter/category": {
+                          "data": "eq,in"
+                        },
+                        "/dev/sigma/endpoints/products/readFilter/price": {
+                          "data": "eq,gt,gte,lt,lte"
+                        }
+                      }
+                    },
+                    "/dev/sigma/endpoints/products/writeFilter": {
+                      "data": "",
+                      "children": {
+                        "/dev/sigma/endpoints/products/writeFilter/id": {
+                          "data": "eq"
+                        }
+                      }
+                    }
+                  }
+                },
+                "/dev/sigma/endpoints/users": {
+                  "data": "",
+                  "children": {
+                    "/dev/sigma/endpoints/users/path": {
+                      "data": "/users"
+                    },
+                    "/dev/sigma/endpoints/users/httpMethod": {
+                      "data": "GET,POST"
+                    },
+                    "/dev/sigma/endpoints/users/databaseCollection": {
+                      "data": "users"
+                    },
+                    "/dev/sigma/endpoints/users/type": {
+                      "data": "REST"
+                    },
+                    "/dev/sigma/endpoints/users/writeMethods": {
+                      "data": "POST"
+                    },
+                    "/dev/sigma/endpoints/users/readFilter": {
+                      "data": "",
+                      "children": {
+                        "/dev/sigma/endpoints/users/readFilter/username": {
+                          "data": "eq,regex"
+                        },
+                        "/dev/sigma/endpoints/users/readFilter/email": {
+                          "data": "eq"
+                        },
+                        "/dev/sigma/endpoints/users/readFilter/status": {
+                          "data": "eq,in"
+                        }
+                      }
+                    },
+                    "/dev/sigma/endpoints/users/writeFilter": {
+                      "data": "",
+                      "children": {
+                        "/dev/sigma/endpoints/users/writeFilter/id": {
+                          "data": "eq"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "/dev/Globals": {
+          "data": "",
+          "children": {
+            "/dev/Globals/EnableEnumService": {
+              "data": "false"
+            },
+            "/dev/Globals/IsEnvValidate": {
+              "data": "false"
+            }
+          }
+        }
+      }
+    }
+  }
+}

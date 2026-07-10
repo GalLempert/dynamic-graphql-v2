@@ -4,13 +4,20 @@ import org.apache.zookeeper.KeeperException;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Reads configuration trees from a live ZooKeeper connection.
+ * Disabled with zookeeper.enabled=false; local dev mode provides a
+ * file-backed replacement (see sigma.config.local.LocalDevConfig).
+ */
 @Component
+@ConditionalOnProperty(name = "zookeeper.enabled", havingValue = "true", matchIfMissing = true)
 public class ZookeeperTreeReader {
 
     private static final Logger logger = LoggerFactory.getLogger(ZookeeperTreeReader.class);

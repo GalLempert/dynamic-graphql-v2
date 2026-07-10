@@ -6,6 +6,7 @@ import org.apache.zookeeper.Watcher;
 import org.apache.zookeeper.ZooKeeper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import sigma.zookeeper.event.ZookeeperNodeRemovedEvent;
@@ -13,7 +14,13 @@ import sigma.zookeeper.event.ZookeeperNodeUpdatedEvent;
 
 import java.util.List;
 
+/**
+ * Watches a live ZooKeeper tree for changes.
+ * Disabled with zookeeper.enabled=false; local dev mode provides a
+ * no-op replacement (see sigma.config.local.LocalDevConfig).
+ */
 @Component
+@ConditionalOnProperty(name = "zookeeper.enabled", havingValue = "true", matchIfMissing = true)
 public class ZookeeperWatcher implements Watcher {
 
     private static final Logger logger = LoggerFactory.getLogger(ZookeeperWatcher.class);
