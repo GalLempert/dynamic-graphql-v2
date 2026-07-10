@@ -249,8 +249,9 @@ public class H2IntegrationTestConfig {
 
         @Override
         public void updateEndpoint(Endpoint endpoint) {
-            String cacheKey = endpoint.getCacheKey();
-            endpoints.put(cacheKey, endpoint);
+            for (String cacheKey : endpoint.getCacheKeys()) {
+                endpoints.put(cacheKey, endpoint);
+            }
         }
 
         @Override

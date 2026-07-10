@@ -40,7 +40,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  */
 @SpringBootTest(
         webEnvironment = SpringBootTest.WebEnvironment.MOCK,
-        properties = "spring.main.allow-bean-definition-overriding=true")
+        properties = "zookeeper.enabled=false")
 @AutoConfigureMockMvc
 @ActiveProfiles("h2")
 @ContextConfiguration(initializers = TestEnvironmentInitializer.class)
@@ -102,7 +102,7 @@ class H2FullLifecycleIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productJson))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
 
         String responseBody = result.getResponse().getContentAsString();
@@ -142,7 +142,7 @@ class H2FullLifecycleIntegrationTest {
         MvcResult result = mockMvc.perform(post("/api/products")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(productsJson))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
 
         String responseBody = result.getResponse().getContentAsString();
@@ -335,10 +335,11 @@ class H2FullLifecycleIntegrationTest {
     void testUpdateProductById() throws Exception {
         assertNotNull(createdProductId1, "Product ID should be set from creation test");
 
+        // PUT is the upsert verb: body carries the fields to merge under "document"
         String updateJson = String.format("""
             {
                 "filter": {"id": {"eq": %d}},
-                "update": {"price": 1199.99, "onSale": true}
+                "document": {"price": 1199.99, "onSale": true}
             }
             """, createdProductId1);
 
@@ -455,9 +456,13 @@ class H2FullLifecycleIntegrationTest {
         @SuppressWarnings("unchecked")
         List<Map<String, Object>> data2 = (List<Map<String, Object>>) response2.get("data");
 
-        // Verify different documents on each page
+        // Verify different documents on each page (id lives in the documentKey map)
         if (!data1.isEmpty() && !data2.isEmpty()) {
-            assertNotEquals(data1.get(0).get("id"), data2.get(0).get("id"),
+            @SuppressWarnings("unchecked")
+            Map<String, Object> key1 = (Map<String, Object>) data1.get(0).get("documentKey");
+            @SuppressWarnings("unchecked")
+            Map<String, Object> key2 = (Map<String, Object>) data2.get(0).get("documentKey");
+            assertNotEquals(key1.get("id"), key2.get("id"),
                     "Pagination should return different documents");
         }
     }
@@ -509,7 +514,7 @@ class H2FullLifecycleIntegrationTest {
         MvcResult createResult = mockMvc.perform(post("/api/users")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(userJson))
-                .andExpect(status().isOk())
+                .andExpect(status().isCreated())
                 .andReturn();
 
         String createBody = createResult.getResponse().getContentAsString();

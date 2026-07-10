@@ -134,6 +134,19 @@ public class Endpoint {
         return httpMethod.toUpperCase() + ":" + path;
     }
 
+    /**
+     * Creates one cache key per supported HTTP method.
+     * httpMethod may be a comma-separated list (e.g. "GET,POST,PUT,DELETE"),
+     * while lookups always use a single method, so each method needs its own key.
+     */
+    public Set<String> getCacheKeys() {
+        return java.util.Arrays.stream(httpMethod.split(","))
+                .map(String::trim)
+                .filter(m -> !m.isEmpty())
+                .map(m -> m.toUpperCase() + ":" + path)
+                .collect(java.util.stream.Collectors.toUnmodifiableSet());
+    }
+
     @Override
     public String toString() {
         return "Endpoint{" +

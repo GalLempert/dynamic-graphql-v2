@@ -5,9 +5,12 @@ import com.zaxxer.hikari.HikariDataSource;
 import org.postgresql.util.PGobject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
+import org.springframework.data.convert.ReadingConverter;
+import org.springframework.data.convert.WritingConverter;
 import org.springframework.data.jdbc.core.convert.JdbcCustomConversions;
 import org.springframework.data.jdbc.repository.config.AbstractJdbcConfiguration;
 import org.springframework.data.jdbc.repository.config.EnableJdbcAuditing;
@@ -43,7 +46,13 @@ public class PostgresConfig extends AbstractJdbcConfiguration {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * PostgreSQL DataSource built from ZooKeeper-provided connection details.
+     * Only active for the postgresql database type; other types (h2, oracle)
+     * rely on Spring Boot's spring.datasource.* auto-configuration.
+     */
     @Bean
+    @ConditionalOnProperty(name = "sigma.database.type", havingValue = "postgresql", matchIfMissing = true)
     public DataSource dataSource() {
         String host = configProperties.getPostgresHost();
         String port = configProperties.getPostgresPort();
@@ -76,7 +85,7 @@ public class PostgresConfig extends AbstractJdbcConfiguration {
     }
 
     @Bean
-    public NamedParameterJdbcOperations namedParameterJdbcOperations(DataSource dataSource) {
+    public NamedParameterJdbcTemplate namedParameterJdbcOperations(DataSource dataSource) {
         return new NamedParameterJdbcTemplate(dataSource);
     }
 
@@ -91,13 +100,15 @@ public class PostgresConfig extends AbstractJdbcConfiguration {
     public JdbcCustomConversions jdbcCustomConversions() {
         return new JdbcCustomConversions(Arrays.asList(
                 new MapToJsonbConverter(objectMapper),
-                new JsonbToMapConverter(objectMapper)
+                new JsonbToMapConverter(objectMapper),
+                new StringToMapConverter(objectMapper)
         ));
     }
 
     /**
      * Converter: Map -> PGobject (JSONB)
      */
+    @WritingConverter
     static class MapToJsonbConverter implements Converter<Map<String, Object>, PGobject> {
         private final ObjectMapper objectMapper;
 
@@ -119,8 +130,35 @@ public class PostgresConfig extends AbstractJdbcConfiguration {
     }
 
     /**
+     * Converter: JSON string -> Map
+     * Used by databases that return JSON columns as text (H2, Oracle)
+     */
+    @ReadingConverter
+    static class StringToMapConverter implements Converter<String, Map<String, Object>> {
+        private final ObjectMapper objectMapper;
+
+        StringToMapConverter(ObjectMapper objectMapper) {
+            this.objectMapper = objectMapper;
+        }
+
+        @Override
+        @SuppressWarnings("unchecked")
+        public Map<String, Object> convert(String source) {
+            if (source == null || source.isBlank()) {
+                return new HashMap<>();
+            }
+            try {
+                return objectMapper.readValue(source, Map.class);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to convert JSON string to Map", e);
+            }
+        }
+    }
+
+    /**
      * Converter: PGobject (JSONB) -> Map
      */
+    @ReadingConverter
     static class JsonbToMapConverter implements Converter<PGobject, Map<String, Object>> {
         private final ObjectMapper objectMapper;
 

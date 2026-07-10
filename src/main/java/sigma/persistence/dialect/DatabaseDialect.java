@@ -105,6 +105,15 @@ public interface DatabaseDialect {
      */
     String jsonTypeCheck(String column, String fieldPath, String jsonType);
 
+    /**
+     * Returns an ORDER BY fragment for a JSON field.
+     * Dialects should sort numeric values numerically where possible;
+     * the default falls back to text ordering.
+     */
+    default String jsonOrderBy(String column, String fieldPath, String direction) {
+        return jsonExtractText(column, fieldPath) + " " + direction;
+    }
+
     // ===== Array Operations =====
 
     /**

@@ -115,9 +115,10 @@ public class EndpointRegistry {
                     fatherDocument
                 );
 
-                String cacheKey = endpoint.getCacheKey();
-                endpointCache.put(cacheKey, endpoint);
-                logger.info("Registered endpoint: {} -> {}", cacheKey, endpoint);
+                for (String cacheKey : endpoint.getCacheKeys()) {
+                    endpointCache.put(cacheKey, endpoint);
+                    logger.info("Registered endpoint: {} -> {}", cacheKey, endpoint);
+                }
 
             } catch (Exception e) {
                 logger.error("Failed to create endpoint for: {}", name, e);
@@ -147,19 +148,26 @@ public class EndpointRegistry {
      * Called when Zookeeper configuration changes
      */
     public void updateEndpoint(Endpoint endpoint) {
-        String cacheKey = endpoint.getCacheKey();
-        endpointCache.put(cacheKey, endpoint);
-        logger.info("Updated endpoint: {} -> {}", cacheKey, endpoint);
+        for (String cacheKey : endpoint.getCacheKeys()) {
+            endpointCache.put(cacheKey, endpoint);
+            logger.info("Updated endpoint: {} -> {}", cacheKey, endpoint);
+        }
     }
 
     /**
      * Removes an endpoint from the cache
      */
     public void removeEndpoint(String path, String httpMethod) {
-        String cacheKey = httpMethod.toUpperCase() + ":" + path;
-        Endpoint removed = endpointCache.remove(cacheKey);
-        if (removed != null) {
-            logger.info("Removed endpoint: {}", cacheKey);
+        for (String method : httpMethod.split(",")) {
+            String trimmed = method.trim();
+            if (trimmed.isEmpty()) {
+                continue;
+            }
+            String cacheKey = trimmed.toUpperCase() + ":" + path;
+            Endpoint removed = endpointCache.remove(cacheKey);
+            if (removed != null) {
+                logger.info("Removed endpoint: {}", cacheKey);
+            }
         }
     }
 
