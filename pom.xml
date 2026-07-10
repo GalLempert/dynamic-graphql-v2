@@ -70,11 +70,10 @@
             <artifactId>spring-boot-starter-data-jdbc</artifactId>
         </dependency>
 
-        <!-- PostgreSQL Driver -->
+        <!-- PostgreSQL Driver (compile scope: PostgresConfig uses PGobject) -->
         <dependency>
             <groupId>org.postgresql</groupId>
             <artifactId>postgresql</artifactId>
-            <scope>runtime</scope>
         </dependency>
 
         <!-- Oracle JDBC Driver (UCP included) -->
@@ -84,11 +83,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- H2 Database for local development and testing -->
+        <!-- H2 Database for local development and testing
+             (compile scope: H2SequenceTrigger implements org.h2.api.Trigger) -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>runtime</scope>
         </dependency>
 
         <!-- Kafka -->

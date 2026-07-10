@@ -38,7 +38,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  *
  * ZooKeeper is fully mocked - no external dependencies required.
  */
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.MOCK,
+        properties = "spring.main.allow-bean-definition-overriding=true")
 @AutoConfigureMockMvc
 @ActiveProfiles("h2")
 @ContextConfiguration(initializers = TestEnvironmentInitializer.class)

@@ -3,7 +3,7 @@ package sigma.service.query;
 import sigma.dto.request.QueryRequest;
 import sigma.dto.response.QueryResponse;
 import sigma.model.Endpoint;
-import sigma.persistence.repository.DynamicMongoRepository;
+import sigma.persistence.repository.DynamicDocumentRepository;
 import sigma.service.query.strategy.QueryExecutionStrategy;
 import sigma.service.query.strategy.QueryExecutionStrategyFactory;
 import org.junit.jupiter.api.BeforeEach;
@@ -20,7 +20,7 @@ import static org.mockito.Mockito.*;
 class QueryServiceTest {
 
     @Mock
-    private DynamicMongoRepository mongoRepository;
+    private DynamicDocumentRepository documentRepository;
 
     @Mock
     private QueryBuilder queryBuilder;
@@ -44,7 +44,7 @@ class QueryServiceTest {
 
     @BeforeEach
     void setUp() {
-        queryService = new QueryService(mongoRepository, queryBuilder, strategyFactory);
+        queryService = new QueryService(documentRepository, queryBuilder, strategyFactory);
     }
 
     @Test
@@ -85,7 +85,7 @@ class QueryServiceTest {
 
     @Test
     void testGetRepository() {
-        assertEquals(mongoRepository, queryService.getRepository());
+        assertEquals(documentRepository, queryService.getRepository());
     }
 
     @Test
