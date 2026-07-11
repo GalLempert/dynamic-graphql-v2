@@ -6,8 +6,7 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import sigma.model.schema.JsonSchema;
 import sigma.service.enums.EnumRegistry;
 import sigma.service.enums.EnumRegistryListener;
-import org.apache.zookeeper.KeeperException;
-import org.apache.zookeeper.ZooKeeper;
+import sigma.zookeeper.ZookeeperConfigService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,14 +17,14 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages JSON Schemas loaded from ZooKeeper
+ * Manages JSON Schemas loaded from the configuration tree
  *
  * Responsibilities:
- * - Load schemas from ZooKeeper on demand
+ * - Load schemas from the configuration service on demand
  * - Cache schemas in memory
  * - Provide access to schemas by name
  *
- * ZooKeeper Structure:
+ * Configuration structure:
  * /{ENV}/{SERVICE}/schemas/
  *   ├── base-types       (common type definitions)
  *   ├── user-schema
@@ -37,18 +36,18 @@ public class SchemaManager implements EnumRegistryListener {
 
     private static final Logger logger = LoggerFactory.getLogger(SchemaManager.class);
 
-    private final ZooKeeper zooKeeper;
+    private final ZookeeperConfigService configService;
     private final String schemasBasePath;
     private final ObjectMapper objectMapper;
     private final Map<String, JsonSchema> schemaCache;
     private final EnumSchemaAugmentor enumSchemaAugmentor;
 
     public SchemaManager(
-            ZooKeeper zooKeeper,
+            ZookeeperConfigService configService,
             @Value("${zookeeper.base-path}") String basePath,
             ObjectMapper objectMapper,
             EnumRegistry enumRegistry) {
-        this.zooKeeper = zooKeeper;
+        this.configService = configService;
         this.schemasBasePath = basePath + "/schemas";
         this.objectMapper = objectMapper;
         this.schemaCache = new ConcurrentHashMap<>();
@@ -73,22 +72,24 @@ public class SchemaManager implements EnumRegistryListener {
             return cached;
         }
 
-        // Load from ZooKeeper
-        logger.info("Loading schema '{}' from ZooKeeper", schemaName);
-        return loadSchemaFromZooKeeper(schemaName);
+        // Load from the configuration tree
+        logger.info("Loading schema '{}' from configuration", schemaName);
+        return loadSchemaFromConfiguration(schemaName);
     }
 
     /**
-     * Loads a schema from ZooKeeper and caches it
+     * Loads a schema from the configuration tree and caches it
      */
-    private JsonSchema loadSchemaFromZooKeeper(String schemaName) {
+    private JsonSchema loadSchemaFromConfiguration(String schemaName) {
         String schemaPath = schemasBasePath + "/" + schemaName;
 
-        try {
-            // Get schema data from ZooKeeper
-            byte[] data = zooKeeper.getData(schemaPath, false, null);
-            String schemaJson = new String(data);
+        String schemaJson = configService.getNodeDataAsString(schemaPath);
+        if (schemaJson == null) {
+            logger.warn("Schema '{}' not found in configuration at path: {}", schemaName, schemaPath);
+            return null;
+        }
 
+        try {
             // Parse as JSON
             JsonNode schemaNode = objectMapper.readTree(schemaJson);
             if (!(schemaNode instanceof ObjectNode objectNode)) {
@@ -102,15 +103,11 @@ public class SchemaManager implements EnumRegistryListener {
             JsonSchema schema = new JsonSchema(schemaName, result.schema(), result.bindings());
             schemaCache.put(schemaName, schema);
 
-            logger.info("Successfully loaded schema '{}' from ZooKeeper", schemaName);
+            logger.info("Successfully loaded schema '{}'", schemaName);
             return schema;
 
-        } catch (KeeperException.NoNodeException e) {
-            logger.warn("Schema '{}' not found in ZooKeeper at path: {}", schemaName, schemaPath);
-            return null;
-
-        } catch (KeeperException | InterruptedException | IOException e) {
-            logger.error("Error loading schema '{}' from ZooKeeper", schemaName, e);
+        } catch (IOException e) {
+            logger.error("Error parsing schema '{}'", schemaName, e);
             return null;
         } catch (RuntimeException e) {
             logger.error("Error processing schema '{}'", schemaName, e);

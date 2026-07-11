@@ -695,20 +695,32 @@ zkCli.sh create /dev/my-service/endpoints/products/filter/category "\$eq,\$in"
 ## Running the Application
 
 ### Prerequisites
-- Java 25+
+- Java 21+
 - Maven 3.8+
-- MongoDB 4.4+
-- ZooKeeper 3.8+
+- PostgreSQL or Oracle (production) — not needed in local dev mode
+- ZooKeeper 3.8+ (production) — not needed in local dev mode
 
 ### Build
 ```bash
 mvn clean install
 ```
 
-### Run
+### Run (production configuration)
 ```bash
-mvn spring-boot:run
+ENV=dev SERVICE=sigma ZOOKEEPER_URL=localhost:2181 mvn spring-boot:run
 ```
+
+### Run (local dev mode — no ZooKeeper, no external database)
+```bash
+ENV=dev SERVICE=sigma mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+Local dev mode uses an in-memory H2 database and reads endpoint
+configuration from `src/main/resources/local-config.json` instead of
+ZooKeeper. The file uses the same tree format as `zookeeper-import.json`,
+so the same document can later be imported into a real ZooKeeper.
+Point `sigma.local-config.file` at another file (e.g.
+`file:/path/to/config.json`) to customize endpoints without rebuilding.
 
 The application will start on port 8080 (configurable via `server.port`).
 

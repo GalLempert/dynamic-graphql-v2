@@ -45,7 +45,7 @@ class FilterTranslatorTest {
         FilterRequest filterRequest = new FilterRequest(filterMap, options);
 
         FilterNode filterNode = mock(FilterNode.class);
-        SqlPredicate predicate = SqlPredicate.jsonbEquals("field", "value", "param0");
+        SqlPredicate predicate = SqlPredicate.jsonbEquals("field", "value");
         when(filterParser.parse(filterMap)).thenReturn(filterNode);
         when(filterNode.toPredicate()).thenReturn(predicate);
 
@@ -55,7 +55,7 @@ class FilterTranslatorTest {
         // Then
         assertNotNull(result);
         assertNotNull(result.getWhereClause());
-        assertTrue(result.getWhereClause().contains("param0"));
+        assertTrue(result.getWhereClause().contains("field"));
         assertEquals(10, result.getLimit());
         assertEquals(5, result.getOffset());
         assertNotNull(result.getOrderByClause());

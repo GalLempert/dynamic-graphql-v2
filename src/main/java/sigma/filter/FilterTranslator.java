@@ -3,6 +3,7 @@ package sigma.filter;
 import sigma.model.filter.FilterRequest;
 import sigma.model.filter.FilterResult;
 import sigma.model.filter.SqlPredicate;
+import sigma.model.filter.SqlPredicateFactory;
 import sigma.model.filter.node.FieldFilterNode;
 import sigma.model.filter.node.FilterNode;
 import org.slf4j.Logger;
@@ -134,21 +135,13 @@ public class FilterTranslator {
     /**
      * Builds an ORDER BY fragment for a single field.
      * For id, uses the id column directly.
-     * For other fields, uses JSONB path expression.
+     * For other fields, uses the dialect's JSON text extraction on the data column.
      */
     private String buildOrderByForField(String field, String direction) {
         if ("id".equals(field)) {
             return "d.id " + direction;
         }
-        // For JSONB fields, we sort by the text value
-        return "d.dynamicFields->>'" + escapeJsonKey(field) + "' " + direction;
-    }
-
-    /**
-     * Escapes a JSON key for use in PostgreSQL JSONB path expressions
-     */
-    private String escapeJsonKey(String key) {
-        return key.replace("'", "''").replace("\\", "\\\\");
+        return SqlPredicateFactory.getDialect().jsonOrderBy("d.data", field, direction);
     }
 
     /**

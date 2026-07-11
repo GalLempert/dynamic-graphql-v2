@@ -40,6 +40,7 @@ public class DynamicDocumentRepository {
     private final DynamicDocumentJpaRepository crudRepository;
     private final ObjectMapper objectMapper;
     private final DatabaseDialect dialect;
+    private final RowMapper<DynamicDocument> documentRowMapper;
 
     public DynamicDocumentRepository(
             NamedParameterJdbcTemplate jdbcTemplate,
@@ -50,51 +51,54 @@ public class DynamicDocumentRepository {
         this.crudRepository = crudRepository;
         this.objectMapper = objectMapper;
         this.dialect = dialect;
+        this.documentRowMapper = createDocumentRowMapper();
         logger.info("Initialized DynamicDocumentRepository with dialect: {}", dialect.getType());
     }
 
-    private final RowMapper<DynamicDocument> documentRowMapper = (rs, rowNum) -> {
-        DynamicDocument doc = new DynamicDocument();
-        doc.setId(rs.getLong("id"));
-        doc.setTableName(rs.getString("table_name"));
-        doc.setVersion(rs.getLong("version"));
+    private RowMapper<DynamicDocument> createDocumentRowMapper() {
+        return (rs, rowNum) -> {
+            DynamicDocument doc = new DynamicDocument();
+            doc.setId(rs.getLong("id"));
+            doc.setTableName(rs.getString("table_name"));
+            doc.setVersion(rs.getLong("version"));
 
-        // Handle boolean - Oracle uses NUMBER(1)
-        if (dialect.requiresBooleanConversion()) {
-            doc.setDeleted(rs.getInt("is_deleted") == 1);
-        } else {
-            doc.setDeleted(rs.getBoolean("is_deleted"));
-        }
-
-        doc.setLatestRequestId(rs.getString("latest_request_id"));
-        doc.setCreatedBy(rs.getString("created_by"));
-        doc.setLastModifiedBy(rs.getString("last_modified_by"));
-        doc.setSequenceNumber(rs.getLong("sequence_number"));
-
-        Timestamp createdAt = rs.getTimestamp("created_at");
-        if (createdAt != null) {
-            doc.setCreatedAt(createdAt.toInstant());
-        }
-        Timestamp lastModifiedAt = rs.getTimestamp("last_modified_at");
-        if (lastModifiedAt != null) {
-            doc.setLastModifiedAt(lastModifiedAt.toInstant());
-        }
-
-        // Parse JSON data column
-        String dataJson = rs.getString("data");
-        if (dataJson != null) {
-            try {
-                @SuppressWarnings("unchecked")
-                Map<String, Object> data = objectMapper.readValue(dataJson, Map.class);
-                doc.setDynamicFields(data);
-            } catch (JsonProcessingException e) {
-                logger.error("Error parsing JSON data for document {}", doc.getId(), e);
-                doc.setDynamicFields(new HashMap<>());
+            // Handle boolean - Oracle uses NUMBER(1)
+            if (dialect.requiresBooleanConversion()) {
+                doc.setDeleted(rs.getInt("is_deleted") == 1);
+            } else {
+                doc.setDeleted(rs.getBoolean("is_deleted"));
             }
-        }
 
-        return doc;
-    };
+            doc.setLatestRequestId(rs.getString("latest_request_id"));
+            doc.setCreatedBy(rs.getString("created_by"));
+            doc.setLastModifiedBy(rs.getString("last_modified_by"));
+            doc.setSequenceNumber(rs.getLong("sequence_number"));
+
+            Timestamp createdAt = rs.getTimestamp("created_at");
+            if (createdAt != null) {
+                doc.setCreatedAt(createdAt.toInstant());
+            }
+            Timestamp lastModifiedAt = rs.getTimestamp("last_modified_at");
+            if (lastModifiedAt != null) {
+                doc.setLastModifiedAt(lastModifiedAt.toInstant());
+            }
+
+            // Parse JSON data column
+            String dataJson = rs.getString("data");
+            if (dataJson != null) {
+                try {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> data = objectMapper.readValue(dataJson, Map.class);
+                    doc.setDynamicFields(data);
+                } catch (JsonProcessingException e) {
+                    logger.error("Error parsing JSON data for document {}", doc.getId(), e);
+                    doc.setDynamicFields(new HashMap<>());
+                }
+            }
+
+            return doc;
+        };
+    }
 
     /**
      * Performs a select * query on the specified table (collection)
@@ -368,9 +372,10 @@ public class DynamicDocumentRepository {
 
         Instant now = Instant.now();
         for (DynamicDocument doc : documents) {
-            Map<String, Object> dynamicFields = doc.getDynamicFields();
-            if (dynamicFields == null) {
-                dynamicFields = new HashMap<>();
+            // Copy before merging: the existing map may be unmodifiable
+            Map<String, Object> dynamicFields = new HashMap<>();
+            if (doc.getDynamicFields() != null) {
+                dynamicFields.putAll(doc.getDynamicFields());
             }
             dynamicFields.putAll(updates);
             doc.setDynamicFields(dynamicFields);
@@ -431,9 +436,10 @@ public class DynamicDocumentRepository {
             logger.info("Upserted new document with id: {}", insertedId);
         } else {
             DynamicDocument doc = existing.get(0);
-            Map<String, Object> dynamicFields = doc.getDynamicFields();
-            if (dynamicFields == null) {
-                dynamicFields = new HashMap<>();
+            // Copy before merging: the existing map may be unmodifiable
+            Map<String, Object> dynamicFields = new HashMap<>();
+            if (doc.getDynamicFields() != null) {
+                dynamicFields.putAll(doc.getDynamicFields());
             }
             dynamicFields.putAll(document);
             doc.setDynamicFields(dynamicFields);

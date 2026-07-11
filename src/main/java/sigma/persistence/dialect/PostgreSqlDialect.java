@@ -82,6 +82,12 @@ public class PostgreSqlDialect implements DatabaseDialect {
     }
 
     @Override
+    public String jsonOrderBy(String column, String fieldPath, String direction) {
+        // Sorting on the jsonb value (->) is type-aware: numbers sort numerically
+        return String.format("%s->'%s' %s", column, escapeFieldPath(fieldPath), direction);
+    }
+
+    @Override
     public String jsonEquals(String column, String fieldPath, String paramName) {
         return String.format("%s->>'%s' = :%s", column, escapeFieldPath(fieldPath), paramName);
     }

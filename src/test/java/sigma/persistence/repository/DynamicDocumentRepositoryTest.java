@@ -227,7 +227,11 @@ class DynamicDocumentRepositoryTest {
         // Return empty list to simulate no existing document
         when(jdbcTemplate.query(anyString(), any(MapSqlParameterSource.class), any(RowMapper.class)))
                 .thenReturn(List.of());
-        doAnswer(invocation -> 1).when(jdbcTemplate).update(anyString(), any(MapSqlParameterSource.class), any(KeyHolder.class), any(String[].class));
+        doAnswer(invocation -> {
+            KeyHolder keyHolder = invocation.getArgument(2);
+            keyHolder.getKeyList().add(Map.of("id", 1L));
+            return 1;
+        }).when(jdbcTemplate).update(anyString(), any(MapSqlParameterSource.class), any(KeyHolder.class), any(String[].class));
 
         // When
         Map<String, Object> result = repository.upsert(TABLE_NAME, whereClause, documentData, params);
@@ -350,6 +354,6 @@ class DynamicDocumentRepositoryTest {
         verify(jdbcTemplate).query(sqlCaptor.capture(), any(MapSqlParameterSource.class), any(RowMapper.class));
         String capturedSql = sqlCaptor.getValue();
         assertTrue(capturedSql.contains("sequence_number > :startSequence"));
-        assertTrue(capturedSql.contains("ORDER BY sequence_number ASC"));
+        assertTrue(capturedSql.contains("ORDER BY d.sequence_number ASC"));
     }
 }
