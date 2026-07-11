@@ -4,7 +4,7 @@
   <img src="docs/sigma-logo.svg" alt="Sigma Logo" width="220" />
 </p>
 
-A **dynamic, configuration-driven API gateway** that serves REST and GraphQL APIs backed by MongoDB, with all endpoint configurations stored in ZooKeeper. Built with Spring Boot and designed for maximum flexibility and reusability.
+A **dynamic, configuration-driven API gateway** that serves REST and GraphQL APIs backed by relational databases (PostgreSQL, Oracle, H2) with JSON document storage, with all endpoint configurations stored in ZooKeeper. Built with Spring Boot and designed for maximum flexibility and reusability.
 
 ## Overview
 
@@ -13,8 +13,61 @@ This application dynamically creates API endpoints based on configurations store
 - **Creates REST endpoints** with filtering, sorting, and pagination
 - **Creates GraphQL queries** (integration ready)
 - **Validates requests** against configuration rules
-- **Executes MongoDB queries** with change stream support
+- **Executes JSON document queries** with sequence-based change tracking
 - **Handles errors** consistently across all endpoints
+
+## Quick Start
+
+Run the whole service on your machine in under a minute — **no ZooKeeper, no database, no Docker**. Local dev mode uses an in-memory H2 database and reads endpoint definitions from a JSON file.
+
+**Prerequisites:** Java 21+ and Maven 3.8+. That's it.
+
+```bash
+git clone https://github.com/GalLempert/dynamic-graphql-v2.git
+cd dynamic-graphql-v2
+ENV=dev SERVICE=sigma mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+The server starts on **http://localhost:8080** with two example endpoints (`products` and `users`) preconfigured. Try it:
+
+```bash
+# Create a document (any JSON shape - the storage is schemaless)
+curl -X POST localhost:8080/api/products \
+  -H 'Content-Type: application/json' \
+  -d '{"name": "Laptop", "category": "electronics", "price": 999.99}'
+
+# List everything
+curl localhost:8080/api/products
+
+# Filter with MongoDB-style operators (eq, gt, gte, lt, lte, in, regex, and, or...)
+curl -X POST localhost:8080/api/products \
+  -H 'Content-Type: application/json' \
+  -d '{"filter": {"price": {"gt": 500}}, "options": {"sort": {"price": -1}, "limit": 10}}'
+
+# Update via upsert (PUT merges "document" into whatever matches "filter")
+curl -X PUT localhost:8080/api/products \
+  -H 'Content-Type: application/json' \
+  -d '{"filter": {"id": {"eq": 1}}, "document": {"onSale": true}}'
+
+# Soft delete
+curl -X DELETE localhost:8080/api/products \
+  -H 'Content-Type: application/json' \
+  -d '{"filter": {"id": {"eq": 1}}}'
+
+# Health check
+curl localhost:8080/health
+```
+
+**Useful while developing:**
+
+| What | Where |
+|---|---|
+| Endpoint definitions (add/edit endpoints, filters, write permissions) | `src/main/resources/local-config.json` — edit and restart; or point `sigma.local-config.file` at any file (`file:/path/to/config.json`) |
+| Browse the raw database | H2 console at http://localhost:8080/h2-console (JDBC URL `jdbc:h2:mem:sigma-local`, user `sa`, empty password) |
+| Metrics | http://localhost:8080/actuator/prometheus |
+| Run the test suite | `mvn test` (no external services needed) |
+
+The local config file uses the exact same tree format as `zookeeper-import.json`, so endpoint definitions you prototype locally can be imported into a real ZooKeeper unchanged. For running against real infrastructure (ZooKeeper + PostgreSQL/Oracle), see [Running the Application](#running-the-application).
 
 ## Key Features
 
