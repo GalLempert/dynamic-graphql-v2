@@ -1,6 +1,6 @@
 package sigma.persistence.repository;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import sigma.model.DynamicDocument;
 import sigma.persistence.dialect.DatabaseDialect;
 import sigma.persistence.dialect.PostgreSqlDialect;

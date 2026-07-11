@@ -1,8 +1,8 @@
 package sigma.service.schema;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.node.ArrayNode;
+import tools.jackson.databind.node.ObjectNode;
 import sigma.model.enums.DynamicEnum;
 import sigma.model.enums.EnumFieldBinding;
 import sigma.model.enums.EnumFieldPointer;
@@ -59,7 +59,7 @@ public class EnumSchemaAugmentor {
         if (objectNode.has("properties")) {
             JsonNode propertiesNode = objectNode.get("properties");
             if (propertiesNode.isObject()) {
-                propertiesNode.fields().forEachRemaining(entry -> {
+                propertiesNode.properties().forEach(entry -> {
                     path.addLast(new EnumFieldPointer.PropertySegment(entry.getKey()));
                     traverse(entry.getValue(), path, bindings, enumsEnabled);
                     path.removeLast();

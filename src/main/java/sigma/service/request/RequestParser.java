@@ -1,6 +1,6 @@
 package sigma.service.request;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import sigma.dto.request.*;
 import sigma.model.Endpoint;
 import sigma.model.filter.FilterRequest;

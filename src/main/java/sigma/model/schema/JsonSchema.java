@@ -1,6 +1,6 @@
 package sigma.model.schema;
 
-import com.fasterxml.jackson.databind.JsonNode;
+import tools.jackson.databind.JsonNode;
 import sigma.model.enums.EnumFieldBinding;
 
 import java.util.List;
