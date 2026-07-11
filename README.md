@@ -542,7 +542,7 @@ X-Time-Format: UNIX
 ## Technology Stack
 
 - **Java 25** - Modern Java features
-- **Spring Boot 3.5** - Application framework
+- **Spring Boot 4.1** - Application framework
 - **Spring Data MongoDB** - MongoDB integration with Change Streams
 - **Netflix DGS** - GraphQL framework (ready for integration)
 - **Apache ZooKeeper** - Dynamic configuration storage

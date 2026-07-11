@@ -1,7 +1,7 @@
 package sigma.config.local;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import sigma.zookeeper.ZookeeperTreeReader;
@@ -10,7 +10,6 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -64,8 +63,7 @@ public class LocalConfigTreeReader extends ZookeeperTreeReader {
     }
 
     private static void collectLeaves(JsonNode nodes, Map<String, byte[]> leaves) {
-        for (Iterator<Map.Entry<String, JsonNode>> it = nodes.fields(); it.hasNext(); ) {
-            Map.Entry<String, JsonNode> entry = it.next();
+        for (Map.Entry<String, JsonNode> entry : nodes.properties()) {
             String path = entry.getKey();
             JsonNode node = entry.getValue();
 

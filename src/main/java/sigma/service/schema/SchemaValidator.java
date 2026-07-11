@@ -1,10 +1,9 @@
 package sigma.service.schema;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
-import com.networknt.schema.ValidationMessage;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import com.networknt.schema.SchemaRegistry;
+import com.networknt.schema.SpecificationVersion;
 import sigma.model.schema.JsonSchema;
 import sigma.service.validation.ValidationResult;
 import org.slf4j.Logger;
@@ -14,7 +13,6 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 /**
  * Validates documents against JSON Schemas
@@ -29,12 +27,12 @@ public class SchemaValidator {
 
     private final SchemaManager schemaManager;
     private final ObjectMapper objectMapper;
-    private final JsonSchemaFactory schemaFactory;
+    private final SchemaRegistry schemaRegistry;
 
     public SchemaValidator(SchemaManager schemaManager, ObjectMapper objectMapper) {
         this.schemaManager = schemaManager;
         this.objectMapper = objectMapper;
-        this.schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V202012);
+        this.schemaRegistry = SchemaRegistry.withDefaultDialect(SpecificationVersion.DRAFT_2020_12);
     }
 
     /**
@@ -58,8 +56,8 @@ public class SchemaValidator {
         JsonNode documentNode = objectMapper.valueToTree(document);
 
         // 3. Create validator and validate
-        com.networknt.schema.JsonSchema validator = schemaFactory.getSchema(jsonSchema.getSchema());
-        Set<ValidationMessage> errors = validator.validate(documentNode);
+        com.networknt.schema.Schema validator = schemaRegistry.getSchema(jsonSchema.getSchema());
+        List<com.networknt.schema.Error> errors = validator.validate(documentNode);
 
         // 4. Convert errors to strings
         if (errors.isEmpty()) {
@@ -67,7 +65,7 @@ public class SchemaValidator {
             return ValidationResult.success();
         } else {
             List<String> errorMessages = errors.stream()
-                    .map(ValidationMessage::getMessage)
+                    .map(com.networknt.schema.Error::getMessage)
                     .toList();
             logger.warn("Document failed validation against schema '{}': {}", schemaName, errorMessages);
             return ValidationResult.failure(errorMessages);

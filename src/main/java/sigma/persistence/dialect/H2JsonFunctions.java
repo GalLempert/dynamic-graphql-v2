@@ -1,7 +1,7 @@
 package sigma.persistence.dialect;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 /**
  * JSON path functions for H2, registered as SQL aliases by the H2 dialect.
@@ -25,7 +25,7 @@ public final class H2JsonFunctions {
      */
     public static String jsonValue(String json, String path) {
         JsonNode node = resolve(json, path);
-        if (node == null || node.isNull() || node.isContainerNode()) {
+        if (node == null || node.isNull() || node.isContainer()) {
             return null;
         }
         return node.asText();
@@ -37,7 +37,7 @@ public final class H2JsonFunctions {
      */
     public static String jsonQuery(String json, String path) {
         JsonNode node = resolve(json, path);
-        if (node == null || !node.isContainerNode()) {
+        if (node == null || !node.isContainer()) {
             return null;
         }
         return node.toString();

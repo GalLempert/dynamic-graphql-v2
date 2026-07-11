@@ -164,8 +164,8 @@ public class RestApiController {
             }
 
             // Parse as JSON and check top-level keys
-            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
-            com.fasterxml.jackson.databind.JsonNode root = mapper.readTree(body);
+            tools.jackson.databind.ObjectMapper mapper = new tools.jackson.databind.ObjectMapper();
+            tools.jackson.databind.JsonNode root = mapper.readTree(body);
 
             // If it has "filter" or "options" as top-level keys, it's a filtered read
             // Otherwise, it's a document to insert

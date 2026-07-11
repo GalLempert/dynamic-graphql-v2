@@ -1,6 +1,7 @@
 package sigma.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import com.zaxxer.hikari.HikariDataSource;
 import org.postgresql.util.PGobject;
 import org.slf4j.Logger;
@@ -23,7 +24,6 @@ import org.springframework.transaction.annotation.EnableTransactionManagement;
 import sigma.config.properties.ZookeeperConfigProperties;
 
 import javax.sql.DataSource;
-import java.io.IOException;
 import java.sql.SQLException;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -122,7 +122,7 @@ public class PostgresConfig extends AbstractJdbcConfiguration {
             jsonObject.setType("jsonb");
             try {
                 jsonObject.setValue(source == null ? "{}" : objectMapper.writeValueAsString(source));
-            } catch (SQLException | IOException e) {
+            } catch (SQLException | JacksonException e) {
                 throw new RuntimeException("Failed to convert Map to JSONB", e);
             }
             return jsonObject;
@@ -149,7 +149,7 @@ public class PostgresConfig extends AbstractJdbcConfiguration {
             }
             try {
                 return objectMapper.readValue(source, Map.class);
-            } catch (IOException e) {
+            } catch (JacksonException e) {
                 throw new RuntimeException("Failed to convert JSON string to Map", e);
             }
         }
@@ -174,7 +174,7 @@ public class PostgresConfig extends AbstractJdbcConfiguration {
             }
             try {
                 return objectMapper.readValue(source.getValue(), Map.class);
-            } catch (IOException e) {
+            } catch (JacksonException e) {
                 throw new RuntimeException("Failed to convert JSONB to Map", e);
             }
         }

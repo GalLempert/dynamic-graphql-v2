@@ -1,8 +1,8 @@
 package sigma.service.schema;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.node.ObjectNode;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import tools.jackson.databind.node.ObjectNode;
 import sigma.model.schema.JsonSchema;
 import sigma.service.enums.EnumRegistry;
 import sigma.service.enums.EnumRegistryListener;
@@ -12,7 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
-import java.io.IOException;
+import tools.jackson.core.JacksonException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -106,7 +106,7 @@ public class SchemaManager implements EnumRegistryListener {
             logger.info("Successfully loaded schema '{}'", schemaName);
             return schema;
 
-        } catch (IOException e) {
+        } catch (JacksonException e) {
             logger.error("Error parsing schema '{}'", schemaName, e);
             return null;
         } catch (RuntimeException e) {

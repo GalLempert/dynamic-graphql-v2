@@ -5,8 +5,8 @@
 **Dynamic Data Service (Sigma)** — A configuration-driven API gateway that serves REST and GraphQL APIs backed by relational databases (PostgreSQL, Oracle, H2). All endpoint configurations are stored in Apache ZooKeeper, enabling dynamic endpoint creation without code deployments.
 
 - **Language:** Java 21 (records, sealed classes, pattern matching, text blocks)
-- **Framework:** Spring Boot 3.5.5
-- **GraphQL:** Netflix DGS 10.4.0
+- **Framework:** Spring Boot 4.1.0 (Spring Framework 7)
+- **GraphQL:** Netflix DGS 12.0.1
 - **Build:** Apache Maven 3.8+
 - **Root package:** `sigma`
 
@@ -173,14 +173,14 @@ src/test/java/sigma/
 
 | Dependency | Purpose |
 |---|---|
-| Spring Boot 3.5.5 | Web framework, DI, actuator |
-| Netflix DGS 10.4.0 | GraphQL integration |
+| Spring Boot 4.1.0 | Web framework, DI, actuator |
+| Netflix DGS 12.0.1 | GraphQL integration |
 | Spring Data JDBC | Database access (JdbcTemplate) |
-| Apache ZooKeeper 3.9.3 | Dynamic configuration management |
-| Jackson | JSON serialization/deserialization |
-| networknt json-schema-validator 1.5.3 | Write request schema validation |
+| Apache ZooKeeper 3.9.5 | Dynamic configuration management |
+| Jackson 3 (tools.jackson) | JSON serialization/deserialization |
+| networknt json-schema-validator 3.0.6 | Write request schema validation |
 | Micrometer + OpenTelemetry | Metrics, tracing, Prometheus export |
-| Logstash Logback Encoder 8.0 | Structured JSON logging |
+| Logstash Logback Encoder 9.0 | Structured JSON logging |
 | Spring Kafka | Event streaming |
 | Lombok | Boilerplate reduction |
 | H2 | In-memory testing database |

@@ -1,7 +1,7 @@
 package sigma.persistence.repository;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
 import sigma.model.DynamicDocument;
 import sigma.persistence.dialect.DatabaseDialect;
 import org.slf4j.Logger;
@@ -90,7 +90,7 @@ public class DynamicDocumentRepository {
                     @SuppressWarnings("unchecked")
                     Map<String, Object> data = objectMapper.readValue(dataJson, Map.class);
                     doc.setDynamicFields(data);
-                } catch (JsonProcessingException e) {
+                } catch (JacksonException e) {
                     logger.error("Error parsing JSON data for document {}", doc.getId(), e);
                     doc.setDynamicFields(new HashMap<>());
                 }
@@ -238,7 +238,7 @@ public class DynamicDocumentRepository {
                     Map<String, Object> doc = objectMapper.readValue(nestedJson, Map.class);
                     nestedDocs.add(doc);
                 }
-            } catch (JsonProcessingException e) {
+            } catch (JacksonException e) {
                 logger.error("Error parsing nested document JSON", e);
             }
         });
@@ -584,7 +584,7 @@ public class DynamicDocumentRepository {
     private String toJsonString(Map<String, Object> map) {
         try {
             return objectMapper.writeValueAsString(map != null ? map : new HashMap<>());
-        } catch (JsonProcessingException e) {
+        } catch (JacksonException e) {
             throw new RuntimeException("Failed to convert Map to JSON string", e);
         }
     }
