@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sigma Console</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --border: #e3e6ea; --text: #1c2430;
+    --muted: #67707d; --accent: #3b5bdb; --chip: #eef1f6; --mono: ui-monospace, Menlo, Consolas, monospace;
+    --get: #2f9e44; --post: #1971c2; --put: #e8890c; --delete: #e03131; --patch: #9c36b5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11151c; --panel: #1a2029; --border: #2a3240; --text: #e7ecf2;
+      --muted: #8b96a5; --accent: #74a0ff; --chip: #232b37;
+    }
+  }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 15px/1.5 system-ui, sans-serif; }
+  header {
+    display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap;
+    padding: 22px 28px; border-bottom: 1px solid var(--border); background: var(--panel);
+  }
+  header h1 { font-size: 20px; letter-spacing: .3px; }
+  header h1 span { color: var(--accent); }
+  .facts { display: flex; gap: 10px; flex-wrap: wrap; margin-left: auto; }
+  .fact { background: var(--chip); border: 1px solid var(--border); border-radius: 20px;
+          padding: 3px 12px; font-size: 12.5px; color: var(--muted); }
+  .fact b { color: var(--text); font-weight: 600; }
+  main { max-width: 1200px; margin: 0 auto; padding: 26px 28px 60px; }
+  h2 { font-size: 14px; text-transform: uppercase; letter-spacing: 1.2px; color: var(--muted); margin: 26px 0 14px; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(420px, 1fr)); gap: 16px; }
+  .card {
+    background: var(--panel); border: 1px solid var(--border); border-radius: 12px; padding: 18px 20px;
+    box-shadow: 0 1px 2px rgba(0,0,0,.04);
+  }
+  .card .top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 4px; }
+  .card .name { font-size: 17px; font-weight: 650; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2.5px 8px; border-radius: 5px; color: #fff; }
+  .path { font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .row { display: flex; gap: 8px; align-items: baseline; margin: 7px 0; flex-wrap: wrap; }
+  .row .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: .8px; color: var(--muted); min-width: 92px; }
+  .chip { background: var(--chip); border: 1px solid var(--border); border-radius: 6px;
+          padding: 2px 8px; font-size: 12px; font-family: var(--mono); }
+  .chip b { color: var(--accent); font-weight: 600; }
+  .none { color: var(--muted); font-size: 12.5px; font-style: italic; }
+  details { margin-top: 26px; }
+  summary { cursor: pointer; color: var(--muted); font-size: 14px; user-select: none; }
+  table { width: 100%; border-collapse: collapse; margin-top: 12px; background: var(--panel);
+          border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  td { padding: 7px 14px; border-top: 1px solid var(--border); font-family: var(--mono); font-size: 12.5px; }
+  td:first-child { color: var(--muted); width: 55%; word-break: break-all; }
+  .error { background: #fff0f0; border: 1px solid #ffc9c9; color: #c92a2a; border-radius: 10px;
+           padding: 14px 18px; margin-top: 20px; }
+  footer { text-align: center; color: var(--muted); font-size: 12px; padding: 20px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>&Sigma; Sigma <span>Console</span></h1>
+  <div class="facts" id="facts"></div>
+</header>
+<main>
+  <h2>Exposed Endpoints</h2>
+  <div class="grid" id="endpoints"></div>
+  <details>
+    <summary>Raw configuration tree (declared state)</summary>
+    <table id="config"></table>
+  </details>
+</main>
+<footer>read-only explorer &middot; phase 0 &middot; editing arrives with the GitOps flow</footer>
+<script>
+const METHOD_COLORS = { GET: 'var(--get)', POST: 'var(--post)', PUT: 'var(--put)', DELETE: 'var(--delete)', PATCH: 'var(--patch)' };
+const esc = s => String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+async function load() {
+  try {
+    const [info, endpoints, config] = await Promise.all([
+      fetch('/console/api/info').then(r => r.json()),
+      fetch('/console/api/endpoints').then(r => r.json()),
+      fetch('/console/api/config').then(r => r.json()),
+    ]);
+
+    document.getElementById('facts').innerHTML = [
+      ['env', info.env], ['service', info.service], ['api prefix', info.apiPrefix],
+      ['database', info.databaseType], ['config nodes', info.configNodeCount],
+    ].map(([k, v]) => `<span class="fact">${esc(k)}: <b>${esc(v)}</b></span>`).join('');
+
+    document.getElementById('endpoints').innerHTML = endpoints.map(ep => `
+      <div class="card">
+        <div class="top">
+          <span class="name">${esc(ep.name)}</span>
+          ${ep.methods.map(m => `<span class="badge" style="background:${METHOD_COLORS[m.trim()] || 'var(--muted)'}">${esc(m.trim())}</span>`).join('')}
+        </div>
+        <div class="path">${esc(info.apiPrefix)}${esc(ep.path)} &rarr; collection <b>${esc(ep.collection)}</b></div>
+        ${filterRow('read filters', ep.readFilter)}
+        ${filterRow('write filters', ep.writeFilter)}
+        <div class="row"><span class="k">writes</span>${
+          ep.writeMethods.length ? ep.writeMethods.map(m => `<span class="chip">${esc(m)}</span>`).join('') : '<span class="none">read-only</span>'}</div>
+        <div class="row"><span class="k">features</span>
+          ${ep.sequenceEnabled ? '<span class="chip">change feed</span>' : ''}
+          ${ep.schema ? `<span class="chip">schema: <b>${esc(ep.schema.name)}</b>${ep.schema.required ? ' (required)' : ''}</span>` : ''}
+          ${ep.subEntities.length ? `<span class="chip">sub-entities: ${ep.subEntities.map(esc).join(', ')}</span>` : ''}
+          ${ep.fatherDocument ? `<span class="chip">nested in <b>${esc(ep.fatherDocument)}</b></span>` : ''}
+          ${!ep.sequenceEnabled && !ep.schema && !ep.subEntities.length && !ep.fatherDocument ? '<span class="none">none</span>' : ''}
+        </div>
+      </div>`).join('');
+
+    document.getElementById('config').innerHTML = Object.entries(config)
+      .map(([path, value]) => `<tr><td>${esc(path)}</td><td>${esc(value)}</td></tr>`).join('');
+  } catch (e) {
+    document.getElementById('endpoints').innerHTML =
+      `<div class="error">Could not reach the console API (${esc(e.message)}). Is the service running with sigma.console.enabled=true?</div>`;
+  }
+}
+
+function filterRow(label, filter) {
+  const fields = filter && filter.fields ? Object.entries(filter.fields) : [];
+  return `<div class="row"><span class="k">${label}</span>${
+    fields.length
+      ? fields.map(([f, ops]) => `<span class="chip"><b>${esc(f)}</b>: ${ops.map(esc).join(', ')}</span>`).join('')
+      : '<span class="none">disabled</span>'}</div>`;
+}
+
+load();
+</script>
+</body>
+</html>
