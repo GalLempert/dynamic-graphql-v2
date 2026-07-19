@@ -45,6 +45,14 @@
             }
           }
         },
+        "/test/dataSource": {
+          "data": "",
+          "children": {
+            "/test/dataSource/postgresql.password": {
+              "data": "super-secret-value"
+            }
+          }
+        },
         "/test/Globals": {
           "data": "",
           "children": {
