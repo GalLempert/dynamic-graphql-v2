@@ -95,8 +95,11 @@ public final class ResourceCompiler {
 
         ResourceDefinition.Actions a = def.getActions();
 
-        // Reads use GET; body-based search uses POST, so POST is always routed.
-        List<String> methods = new ArrayList<>(List.of("GET", "POST"));
+        // GET (and with it, body-based search) is only routed when reading
+        // is allowed; POST is routed for search and/or create.
+        List<String> methods = new ArrayList<>();
+        if (a.isRead()) methods.add("GET");
+        if (a.isRead() || a.isAdd()) methods.add("POST");
         if (a.isChange()) methods.add("PUT");
         if (a.isRemove()) methods.add("DELETE");
 

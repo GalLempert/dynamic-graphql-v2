@@ -11,8 +11,11 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 import sigma.controller.EndpointRegistry;
+import sigma.zookeeper.ZookeeperConfigService;
+import sigma.zookeeper.event.ZookeeperNodeRemovedEvent;
 import sigma.zookeeper.event.ZookeeperNodeUpdatedEvent;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -37,27 +40,44 @@ public class ConfigApplier {
 
     private final ApplicationEventPublisher eventPublisher;
     private final EndpointRegistry endpointRegistry;
+    private final ZookeeperConfigService configService;
     private final ObjectProvider<ZooKeeper> zooKeeper;
 
     public ConfigApplier(ApplicationEventPublisher eventPublisher,
                          EndpointRegistry endpointRegistry,
+                         ZookeeperConfigService configService,
                          ObjectProvider<ZooKeeper> zooKeeper) {
         this.eventPublisher = eventPublisher;
         this.endpointRegistry = endpointRegistry;
+        this.configService = configService;
         this.zooKeeper = zooKeeper;
     }
 
-    public void apply(Map<String, byte[]> nodes) {
+    /**
+     * Replaces the configuration subtree at {@code subtreeBasePath} with
+     * {@code nodes}: new/changed nodes are written and nodes that existed
+     * under the subtree but are absent from the new set are removed, so
+     * revoking a capability (a search field, a write method) actually
+     * takes effect.
+     */
+    public void apply(String subtreeBasePath, Map<String, byte[]> nodes) {
+        String prefix = subtreeBasePath.endsWith("/") ? subtreeBasePath : subtreeBasePath + "/";
+        List<String> stale = configService.getAllConfiguration().keySet().stream()
+                .filter(path -> path.startsWith(prefix) && !nodes.containsKey(path))
+                .toList();
+
         ZooKeeper zk = zooKeeper.getIfAvailable();
         if (zk != null) {
             nodes.forEach((path, data) -> writeZnode(zk, path, data));
+            stale.forEach(path -> deleteZnode(zk, path));
         }
 
+        stale.forEach(path -> eventPublisher.publishEvent(new ZookeeperNodeRemovedEvent(path)));
         nodes.forEach((path, data) -> eventPublisher.publishEvent(new ZookeeperNodeUpdatedEvent(path, data)));
         endpointRegistry.loadEndpoints();
 
-        logger.info("Applied {} configuration nodes ({} mode)", nodes.size(),
-                zk != null ? "ZooKeeper" : "local");
+        logger.info("Applied {} configuration nodes, removed {} stale nodes ({} mode)",
+                nodes.size(), stale.size(), zk != null ? "ZooKeeper" : "local");
     }
 
     private void writeZnode(ZooKeeper zk, String path, byte[] data) {
@@ -73,6 +93,19 @@ public class ConfigApplier {
                 Thread.currentThread().interrupt();
             }
             throw new IllegalStateException("Failed to write ZooKeeper node " + path, e);
+        }
+    }
+
+    private void deleteZnode(ZooKeeper zk, String path) {
+        try {
+            if (zk.exists(path, false) != null) {
+                zk.delete(path, -1);
+            }
+        } catch (KeeperException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            throw new IllegalStateException("Failed to delete ZooKeeper node " + path, e);
         }
     }
 

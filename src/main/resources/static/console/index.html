@@ -97,15 +97,13 @@ async function boot() {
   document.getElementById('facts').innerHTML = [
     ['env', INFO.env], ['service', INFO.service], ['database', INFO.databaseType],
   ].map(([k, v]) => `<span class="fact">${esc(k)}: <b>${esc(v)}</b></span>`).join('');
-  EDITABLE = (await fetch('/console/api/resources')).ok;
+  EDITABLE = INFO.editable === true;
   showList();
 }
 
 async function showList() {
   const main = document.getElementById('main');
-  const resources = EDITABLE
-    ? await fetch('/console/api/resources').then(r => r.json())
-    : [];
+  const resources = await fetch('/console/api/resources').then(r => r.json());
 
   const cards = resources.map((r, i) => `
     <div class="card">
@@ -115,7 +113,7 @@ async function showList() {
         ${r.actions.add ? '<span class="pill">add</span>' : ''}
         ${r.actions.change ? '<span class="pill">change</span>' : ''}
         ${r.actions.remove ? '<span class="pill">remove</span>' : ''}
-        <span style="margin-left:auto"><button class="small" onclick="showEditor(${i})">Edit</button></span>
+        ${EDITABLE ? `<span style="margin-left:auto"><button class="small" onclick="showEditor(${i})">Edit</button></span>` : ''}
       </div>
       <div class="desc">${esc(r.description || 'No description yet.')}</div>
       <div class="row"><span class="k">search by</span>${condChips(r.search)}</div>

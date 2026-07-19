@@ -67,6 +67,32 @@ class ResourceCompilerTest {
     }
 
     @Test
+    @DisplayName("Write-only resource does not route GET, so it is not readable")
+    void testCompileWriteOnly() {
+        ResourceDefinition def = new ResourceDefinition();
+        def.setName("audit-events");
+        def.getActions().setRead(false);
+        def.getActions().setAdd(true);
+
+        Map<String, byte[]> nodes = ResourceCompiler.compile(def, "/b/e");
+        assertEquals("POST", value(nodes, "/b/e/audit-events/httpMethod"));
+        assertEquals("POST", value(nodes, "/b/e/audit-events/writeMethods"));
+    }
+
+    @Test
+    @DisplayName("Change-only resource routes only PUT")
+    void testCompileChangeOnly() {
+        ResourceDefinition def = new ResourceDefinition();
+        def.setName("adjustments");
+        def.getActions().setRead(false);
+        def.getActions().setChange(true);
+
+        Map<String, byte[]> nodes = ResourceCompiler.compile(def, "/b/e");
+        assertEquals("PUT", value(nodes, "/b/e/adjustments/httpMethod"));
+        assertEquals("PUT", value(nodes, "/b/e/adjustments/writeMethods"));
+    }
+
+    @Test
     @DisplayName("Validation speaks product language")
     void testValidation() {
         ResourceDefinition def = new ResourceDefinition();

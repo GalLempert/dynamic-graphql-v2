@@ -29,6 +29,11 @@ public class RequestValidator {
 
     public ValidationResult validate(QueryRequest request, Endpoint endpoint) {
         logger.debug("Validating request of type: {}", request.getType());
+        // Write-only endpoints (no GET routed) must reject every read,
+        // including body-based search arriving via POST
+        if (endpoint != null && !endpoint.isReadEnabled()) {
+            return ValidationResult.failure(List.of("Lookups are not enabled for this endpoint"));
+        }
         return request.validate(this, endpoint);
     }
 

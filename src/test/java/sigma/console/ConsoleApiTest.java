@@ -26,7 +26,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         properties = {
                 "sigma.local-config.file=classpath:local-mode-test-config.json",
                 "spring.datasource.url=jdbc:h2:mem:sigma-console-test;DB_CLOSE_DELAY=-1;MODE=PostgreSQL",
-                "sigma.console.enabled=true"
+                "sigma.console.enabled=true",
+                // explicitly read-only: the explorer must work without the editor
+                "sigma.console.edit.enabled=false"
         })
 @AutoConfigureMockMvc
 @ActiveProfiles("local")
@@ -51,6 +53,20 @@ class ConsoleApiTest {
         assertEquals("dynamic-service", info.get("service"));
         assertEquals("/api", info.get("apiPrefix"));
         assertEquals("H2", info.get("databaseType"));
+        assertEquals(Boolean.FALSE, info.get("editable"), "editing is not enabled in this test");
+    }
+
+    @Test
+    @DisplayName("Resource definitions are listed even in read-only mode")
+    void testResourcesAvailableReadOnly() throws Exception {
+        MvcResult result = mockMvc.perform(get("/console/api/resources"))
+                .andExpect(status().isOk())
+                .andReturn();
+
+        List<Map<String, Object>> resources = objectMapper.readValue(result.getResponse().getContentAsString(),
+                new TypeReference<List<Map<String, Object>>>() {});
+        assertEquals(1, resources.size());
+        assertEquals("gadgets", resources.get(0).get("name"));
     }
 
     @Test

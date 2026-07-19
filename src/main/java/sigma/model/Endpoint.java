@@ -135,6 +135,17 @@ public class Endpoint {
     }
 
     /**
+     * Whether this endpoint allows read operations.
+     * Reads are enabled when GET is among the routed methods; endpoints
+     * without GET are write-only and reject lookups (including body-based
+     * search on POST).
+     */
+    public boolean isReadEnabled() {
+        return java.util.Arrays.stream(httpMethod.split(","))
+                .anyMatch(m -> m.trim().equalsIgnoreCase("GET"));
+    }
+
+    /**
      * Creates one cache key per supported HTTP method.
      * httpMethod may be a comma-separated list (e.g. "GET,POST,PUT,DELETE"),
      * while lookups always use a single method, so each method needs its own key.

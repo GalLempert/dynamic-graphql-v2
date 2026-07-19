@@ -167,4 +167,98 @@ class ConsoleEditApiTest {
         assertEquals(List.of("equals", "one of"), search.get("status"));
         assertEquals(List.of("at least", "at most"), search.get("total"));
     }
+
+    @Test
+    @Order(5)
+    @DisplayName("Revoking a capability through the console actually takes effect")
+    void testRevocationTakesEffect() throws Exception {
+        // searching by total works before the change
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"filter\": {\"total\": {\"gte\": 10}}}"))
+                .andExpect(status().isOk());
+
+        // republish orders WITHOUT the 'total' search field and WITHOUT the add action
+        String revoked = """
+            {
+                "name": "orders",
+                "description": "Customer orders",
+                "actions": {"read": true, "add": false, "change": false, "remove": false},
+                "search": {"status": ["equals", "one of"]},
+                "changeBy": {},
+                "features": {"changeFeed": false, "pageSize": 100}
+            }
+            """;
+        String body = "{\"resource\": " + revoked
+                + ", \"reason\": \"Lock down order search and creation\", \"author\": \"product-team\"}";
+        mockMvc.perform(post("/console/api/resources")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+
+        // the removed search field is rejected now (stale readFilter node is gone)
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"filter\": {\"total\": {\"gte\": 10}}}"))
+                .andExpect(status().isBadRequest());
+
+        // the kept search field still works
+        mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"filter\": {\"status\": {\"eq\": \"open\"}}}"))
+                .andExpect(status().isOk());
+
+        // creating is no longer possible: with the writeMethods node removed,
+        // a document POST is not a write anymore (it falls through to search)
+        MvcResult attempt = mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\": \"sneaky\", \"total\": 1}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertTrue(attempt.getResponse().getContentAsString().trim().startsWith("["),
+                "document POST must be treated as a query, not a create");
+
+        // and no record was created
+        MvcResult check = mockMvc.perform(post("/api/orders")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"filter\": {\"status\": {\"eq\": \"sneaky\"}}}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        assertEquals("[]", check.getResponse().getContentAsString().trim());
+    }
+
+    @Test
+    @Order(6)
+    @DisplayName("A write-only resource rejects all lookups, including body-based search")
+    void testWriteOnlyResourceRejectsReads() throws Exception {
+        String writeOnly = """
+            {
+                "name": "audit-events",
+                "description": "Write-only audit trail",
+                "actions": {"read": false, "add": true, "change": false, "remove": false},
+                "search": {},
+                "changeBy": {},
+                "features": {"changeFeed": false, "pageSize": 100}
+            }
+            """;
+        String body = "{\"resource\": " + writeOnly
+                + ", \"reason\": \"Audit sink\", \"author\": \"product-team\"}";
+        mockMvc.perform(post("/console/api/resources")
+                        .contentType(MediaType.APPLICATION_JSON).content(body))
+                .andExpect(status().isOk());
+
+        // adding records works
+        mockMvc.perform(post("/api/audit-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"event\": \"login\", \"user\": \"gal\"}"))
+                .andExpect(status().isCreated());
+
+        // GET is not even routed
+        mockMvc.perform(get("/api/audit-events")).andExpect(status().isNotFound());
+
+        // body-based search is rejected by the read guard
+        mockMvc.perform(post("/api/audit-events")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"filter\": {\"event\": {\"eq\": \"login\"}}}"))
+                .andExpect(status().isBadRequest());
+    }
 }

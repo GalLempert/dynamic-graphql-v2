@@ -65,7 +65,9 @@ public class EndpointRegistry {
             }
         });
 
-        // Build Endpoint objects
+        // Build Endpoint objects into a fresh map so routes removed from the
+        // configuration also disappear from the cache on reload
+        Map<String, Endpoint> rebuilt = new ConcurrentHashMap<>();
         endpointData.forEach((name, properties) -> {
             try {
                 String path = properties.get("path");
@@ -116,7 +118,7 @@ public class EndpointRegistry {
                 );
 
                 for (String cacheKey : endpoint.getCacheKeys()) {
-                    endpointCache.put(cacheKey, endpoint);
+                    rebuilt.put(cacheKey, endpoint);
                     logger.info("Registered endpoint: {} -> {}", cacheKey, endpoint);
                 }
 
@@ -124,6 +126,9 @@ public class EndpointRegistry {
                 logger.error("Failed to create endpoint for: {}", name, e);
             }
         });
+
+        endpointCache.keySet().retainAll(rebuilt.keySet());
+        endpointCache.putAll(rebuilt);
 
         logger.info("Loaded {} endpoints from Zookeeper", endpointCache.size());
     }

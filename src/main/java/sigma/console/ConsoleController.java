@@ -1,9 +1,12 @@
 package sigma.console;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 import sigma.config.properties.ZookeeperConfigProperties;
+import sigma.console.model.ResourceCompiler;
+import sigma.console.model.ResourceDefinition;
 import sigma.controller.EndpointRegistry;
 import sigma.model.Endpoint;
 import sigma.model.filter.FilterConfig;
@@ -39,15 +42,18 @@ public class ConsoleController {
     private final ZookeeperConfigService configService;
     private final ZookeeperConfigProperties configProperties;
     private final DatabaseDialect databaseDialect;
+    private final boolean editEnabled;
 
     public ConsoleController(EndpointRegistry endpointRegistry,
                              ZookeeperConfigService configService,
                              ZookeeperConfigProperties configProperties,
-                             DatabaseDialect databaseDialect) {
+                             DatabaseDialect databaseDialect,
+                             @Value("${sigma.console.edit.enabled:false}") boolean editEnabled) {
         this.endpointRegistry = endpointRegistry;
         this.configService = configService;
         this.configProperties = configProperties;
         this.databaseDialect = databaseDialect;
+        this.editEnabled = editEnabled;
     }
 
     /**
@@ -61,7 +67,30 @@ public class ConsoleController {
         info.put("apiPrefix", configProperties.getApiPrefix());
         info.put("databaseType", databaseDialect.getType().name());
         info.put("configNodeCount", configService.getAllConfiguration().size());
+        info.put("editable", editEnabled);
         return info;
+    }
+
+    /**
+     * Every resource as a product-language definition.
+     * Available in read-only mode too — only publishing requires the
+     * edit flag (see ConsoleEditController).
+     */
+    @GetMapping("/console/api/resources")
+    public List<ResourceDefinition> resources() {
+        Map<String, Endpoint> byName = new TreeMap<>();
+        endpointRegistry.getAllEndpoints().values()
+                .forEach(endpoint -> byName.putIfAbsent(endpoint.getName(), endpoint));
+
+        List<ResourceDefinition> result = new ArrayList<>();
+        byName.values().forEach(endpoint -> result.add(
+                ResourceCompiler.toDefinition(endpoint, descriptionOf(endpoint))));
+        return result;
+    }
+
+    private String descriptionOf(Endpoint endpoint) {
+        return configService.getNodeDataAsString(
+                configProperties.getEndpointsBasePath() + "/" + endpoint.getName() + "/description");
     }
 
     /**
